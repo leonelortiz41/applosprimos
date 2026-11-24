@@ -1,5 +1,6 @@
 import React from 'react';
 import { Search, X } from 'lucide-react';
+import logo from '../assets/logo1.png';
 
 const HeaderTienda = ({
   tiendaAbierta,
@@ -17,15 +18,25 @@ const HeaderTienda = ({
     <header className="sticky top-0 z-30 bg-[#090a0d]/95 backdrop-blur-md border-b border-white/10 shadow-lg shadow-black/40">
       <div className="max-w-4xl mx-auto px-4 py-3.5 space-y-3">
         <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="text-base sm:text-lg font-black uppercase tracking-tight text-white truncate leading-tight">
-              Bar Los Primos
-            </h1>
-            {estaDisponible && subtituloModalidad && (
-              <p className="text-[11px] font-medium text-gray-400 truncate mt-0.5">
-                {subtituloModalidad}
-              </p>
-            )}
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-11 h-11 rounded-xl bg-[#12151d] border border-white/10 p-1 flex items-center justify-center shrink-0 shadow-inner">
+              <img
+                src={logo}
+                alt="Logo Bar Los Primos"
+                className="w-full h-full object-contain"
+              />
+            </div>
+
+            <div className="min-w-0">
+              <h1 className="text-base sm:text-lg font-black uppercase tracking-tight text-white truncate leading-tight">
+                Bar Los Primos
+              </h1>
+              {estaDisponible && subtituloModalidad && (
+                <p className="text-[11px] font-medium text-gray-400 truncate mt-0.5">
+                  {subtituloModalidad}
+                </p>
+              )}
+            </div>
           </div>
 
           {estaDisponible ? (
