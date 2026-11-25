@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Store, Bike, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { X, Store, Bike, CheckCircle2, ShieldCheck, AlertCircle } from 'lucide-react';
 
 const SECUENCIAS_PROHIBIDAS = [
   '1234567890',
@@ -39,10 +39,12 @@ const ModalCheckout = ({
   abierto,
   onCerrar,
   carrito = [],
+  envioActivo = true,
+  retiroActivo = true,
   onConfirmarPedido,
   enviando = false
 }) => {
-  const [tipoEntrega, setTipoEntrega] = useState('ENVIO'); // 'ENVIO' | 'RETIRO'
+  const [tipoEntrega, setTipoEntrega] = useState(envioActivo ? 'ENVIO' : 'RETIRO');
   const [cliente, setCliente] = useState('');
   const [telefono, setTelefono] = useState('');
   const [numeroConfirmado, setNumeroConfirmado] = useState(false);
@@ -54,7 +56,20 @@ const ModalCheckout = ({
     setNumeroConfirmado(false);
   }, [telefono]);
 
+  // Sincronizar modalidad válida al abrir o si cambia la config desde el POS
+  useEffect(() => {
+    if (!envioActivo && retiroActivo) {
+      setTipoEntrega('RETIRO');
+    } else if (envioActivo && !retiroActivo) {
+      setTipoEntrega('ENVIO');
+    } else if (envioActivo && abierto) {
+      setTipoEntrega((prev) => prev || 'ENVIO');
+    }
+  }, [envioActivo, retiroActivo, abierto]);
+
   if (!abierto) return null;
+
+  const sinModalidadDisponible = !envioActivo && !retiroActivo;
 
   const totalPedido = carrito.reduce(
     (acc, item) => acc + (Number(item.precioUnitario ?? item.precio) || 0) * item.cantidad,
@@ -63,9 +78,31 @@ const ModalCheckout = ({
 
   const telefonoFormatoOk = esTelefonoValido(telefono);
 
+  const handleSeleccionarEntrega = (modalidad) => {
+    if (modalidad === 'ENVIO' && !envioActivo) return;
+    if (modalidad === 'RETIRO' && !retiroActivo) return;
+    setTipoEntrega(modalidad);
+    setError('');
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    if (sinModalidadDisponible) {
+      setError('Por el momento no hay modalidades de entrega disponibles.');
+      return;
+    }
+
+    if (tipoEntrega === 'ENVIO' && !envioActivo) {
+      setError('El envío a domicilio se encuentra deshabilitado en este momento.');
+      return;
+    }
+
+    if (tipoEntrega === 'RETIRO' && !retiroActivo) {
+      setError('El retiro en local se encuentra deshabilitado en este momento.');
+      return;
+    }
 
     if (!cliente.trim() || cliente.trim().length < 2) {
       setError('Ingresá tu nombre para identificar el pedido.');
@@ -131,39 +168,86 @@ const ModalCheckout = ({
             className="hidden"
           />
 
-          {/* Selector Envío (por defecto) vs Retiro */}
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => setTipoEntrega('ENVIO')}
-              className={`p-3 rounded-2xl border text-left transition-colors flex items-center gap-2.5 cursor-pointer ${
-                tipoEntrega === 'ENVIO'
-                  ? 'bg-orange-600/20 border-orange-500 text-white'
-                  : 'bg-black/40 border-white/10 text-gray-400 hover:text-white'
-              }`}
-            >
-              <Bike size={18} className={tipoEntrega === 'ENVIO' ? 'text-orange-400' : ''} />
-              <div>
-                <div className="text-xs font-black uppercase">Envío</div>
-                <div className="text-[10px] opacity-75">A domicilio</div>
-              </div>
-            </button>
+          {/* Selector Envío vs Retiro */}
+          <div className="space-y-2">
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                disabled={!envioActivo}
+                onClick={() => handleSeleccionarEntrega('ENVIO')}
+                className={`p-3 rounded-2xl border text-left transition-colors flex items-center gap-2.5 ${
+                  !envioActivo
+                    ? 'bg-black/25 border-white/5 text-gray-600 opacity-55 cursor-not-allowed'
+                    : tipoEntrega === 'ENVIO'
+                    ? 'bg-orange-600/20 border-orange-500 text-white cursor-pointer'
+                    : 'bg-black/40 border-white/10 text-gray-400 hover:text-white cursor-pointer'
+                }`}
+              >
+                <Bike
+                  size={18}
+                  className={envioActivo && tipoEntrega === 'ENVIO' ? 'text-orange-400' : ''}
+                />
+                <div className="min-w-0">
+                  <div className="text-xs font-black uppercase">Envío</div>
+                  <div className="text-[10px] opacity-75 truncate">
+                    {envioActivo ? 'A domicilio' : 'No disponible'}
+                  </div>
+                </div>
+              </button>
 
-            <button
-              type="button"
-              onClick={() => setTipoEntrega('RETIRO')}
-              className={`p-3 rounded-2xl border text-left transition-colors flex items-center gap-2.5 cursor-pointer ${
-                tipoEntrega === 'RETIRO'
-                  ? 'bg-orange-600/20 border-orange-500 text-white'
-                  : 'bg-black/40 border-white/10 text-gray-400 hover:text-white'
-              }`}
-            >
-              <Store size={18} className={tipoEntrega === 'RETIRO' ? 'text-orange-400' : ''} />
-              <div>
-                <div className="text-xs font-black uppercase">Retiro</div>
-                <div className="text-[10px] opacity-75">En el local</div>
-              </div>
-            </button>
+              <button
+                type="button"
+                disabled={!retiroActivo}
+                onClick={() => handleSeleccionarEntrega('RETIRO')}
+                className={`p-3 rounded-2xl border text-left transition-colors flex items-center gap-2.5 ${
+                  !retiroActivo
+                    ? 'bg-black/25 border-white/5 text-gray-600 opacity-55 cursor-not-allowed'
+                    : tipoEntrega === 'RETIRO'
+                    ? 'bg-orange-600/20 border-orange-500 text-white cursor-pointer'
+                    : 'bg-black/40 border-white/10 text-gray-400 hover:text-white cursor-pointer'
+                }`}
+              >
+                <Store
+                  size={18}
+                  className={retiroActivo && tipoEntrega === 'RETIRO' ? 'text-orange-400' : ''}
+                />
+                <div className="min-w-0">
+                  <div className="text-xs font-black uppercase">Retiro</div>
+                  <div className="text-[10px] opacity-75 truncate">
+                    {retiroActivo ? 'En el local' : 'No disponible'}
+                  </div>
+                </div>
+              </button>
+            </div>
+
+            {!envioActivo && retiroActivo && (
+              <p className="text-[11px] text-amber-300/90 bg-amber-500/10 border border-amber-500/25 rounded-xl px-3 py-2 flex items-center gap-2">
+                <AlertCircle size={14} className="shrink-0 text-amber-400" />
+                <span>
+                  El envío a domicilio está deshabilitado por el momento. Solo disponible para{' '}
+                  <strong className="font-black">retiro en el local</strong>.
+                </span>
+              </p>
+            )}
+
+            {envioActivo && !retiroActivo && (
+              <p className="text-[11px] text-amber-300/90 bg-amber-500/10 border border-amber-500/25 rounded-xl px-3 py-2 flex items-center gap-2">
+                <AlertCircle size={14} className="shrink-0 text-amber-400" />
+                <span>
+                  El retiro en local está deshabilitado por el momento. Solo disponible con{' '}
+                  <strong className="font-black">envío a domicilio</strong>.
+                </span>
+              </p>
+            )}
+
+            {sinModalidadDisponible && (
+              <p className="text-[11px] text-red-300 bg-red-500/10 border border-red-500/30 rounded-xl px-3 py-2 flex items-center gap-2">
+                <AlertCircle size={14} className="shrink-0 text-red-400" />
+                <span>
+                  No hay modalidades de entrega activas en este momento.
+                </span>
+              </p>
+            )}
           </div>
 
           {/* Datos del cliente */}
@@ -176,7 +260,7 @@ const ModalCheckout = ({
                 type="text"
                 value={cliente}
                 onChange={(e) => setCliente(e.target.value)}
-                placeholder="Ej. Lucas Gómez"
+                placeholder="Ej. Juan Pérez"
                 maxLength={60}
                 className="w-full bg-black/60 border border-white/15 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-gray-600 outline-none focus:border-orange-500"
               />
@@ -224,7 +308,7 @@ const ModalCheckout = ({
               )}
             </div>
 
-            {tipoEntrega === 'ENVIO' && (
+            {tipoEntrega === 'ENVIO' && envioActivo && (
               <div>
                 <label className="block text-[11px] font-bold uppercase text-gray-400 mb-1">
                   Dirección de entrega *
@@ -233,7 +317,7 @@ const ModalCheckout = ({
                   type="text"
                   value={direccion}
                   onChange={(e) => setDireccion(e.target.value)}
-                  placeholder="Calle, número, barrio o piso/depto"
+                  placeholder="Barrio, calle, número"
                   maxLength={120}
                   className="w-full bg-black/60 border border-white/15 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-gray-600 outline-none focus:border-orange-500"
                 />
@@ -283,7 +367,7 @@ const ModalCheckout = ({
 
           <button
             type="submit"
-            disabled={enviando}
+            disabled={enviando || sinModalidadDisponible}
             className="w-full bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white py-3.5 rounded-2xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-transform active:scale-[0.99] cursor-pointer"
           >
             <CheckCircle2 size={16} />

@@ -2,6 +2,9 @@ import React from 'react';
 import { Plus, SlidersHorizontal } from 'lucide-react';
 import { apiCliente } from '../services/apiCliente';
 
+const ESTILO_BOTON_AMBAR =
+  'px-3.5 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 bg-gradient-to-b from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-zinc-950 border border-amber-200/50 shadow-md shadow-amber-500/20 hover:shadow-lg hover:shadow-amber-400/30 transition-all duration-200 cursor-pointer select-none hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.97] disabled:translate-y-0 disabled:scale-100 disabled:bg-zinc-800/90 disabled:from-zinc-800 disabled:to-zinc-800 disabled:text-zinc-500 disabled:border-white/5 disabled:shadow-none disabled:cursor-not-allowed';
+
 const CardProducto = ({
   producto,
   sinStock = false,
@@ -54,20 +57,16 @@ const CardProducto = ({
           type="button"
           disabled={sinStock}
           onClick={handleAccionPrincipal}
-          className={`${
-            permitePersonalizar
-              ? 'bg-amber-500 hover:bg-amber-400 text-zinc-950 shadow-lg shadow-amber-500/15'
-              : 'bg-orange-600 hover:bg-orange-500 text-white shadow-lg shadow-orange-600/20'
-          } disabled:bg-zinc-800 disabled:text-zinc-500 disabled:shadow-none px-3.5 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 active:scale-95 transition-all cursor-pointer disabled:cursor-not-allowed`}
+          className={ESTILO_BOTON_AMBAR}
         >
           {permitePersonalizar ? (
             <>
-              <SlidersHorizontal size={14} strokeWidth={2.5} />
+              <SlidersHorizontal size={14} strokeWidth={2.5} className="shrink-0" />
               <span>Personalizar</span>
             </>
           ) : (
             <>
-              <Plus size={15} strokeWidth={2.5} />
+              <Plus size={15} strokeWidth={2.5} className="shrink-0" />
               <span>Agregar</span>
             </>
           )}

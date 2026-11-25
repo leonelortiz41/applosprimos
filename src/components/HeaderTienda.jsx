@@ -2,10 +2,16 @@ import React from 'react';
 import { Search, X } from 'lucide-react';
 import logo from '../assets/logo1.png';
 
+const ESTILO_TAB_ACTIVA =
+  'bg-gradient-to-b from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-zinc-950 border border-amber-200/50 shadow-md shadow-amber-500/20 hover:shadow-lg hover:shadow-amber-400/30 -translate-y-0.5 active:translate-y-0 active:scale-[0.97]';
+
+const ESTILO_TAB_INACTIVA =
+  'bg-[#12151d] text-gray-400 hover:text-white hover:bg-[#171a24] border border-white/10 hover:border-amber-400/35 active:scale-[0.98]';
+
 const HeaderTienda = ({
   tiendaAbierta,
   sinSistema = false,
-  subtituloModalidad,
+  envioActivo = true,
   busqueda,
   onChangeBusqueda,
   tabsVisibles = [],
@@ -19,7 +25,7 @@ const HeaderTienda = ({
       <div className="max-w-4xl mx-auto px-4 py-3.5 space-y-3">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-11 h-11 rounded-xl bg-[#12151d] border border-white/10 p-1 flex items-center justify-center shrink-0 shadow-inner">
+            <div className="w-11 h-11 rounded-xl bg-[#12151d] border border-orange-500/25 p-1 flex items-center justify-center shrink-0 shadow-inner">
               <img
                 src={logo}
                 alt="Logo Bar Los Primos"
@@ -31,9 +37,15 @@ const HeaderTienda = ({
               <h1 className="text-base sm:text-lg font-black uppercase tracking-tight text-white truncate leading-tight">
                 Bar Los Primos
               </h1>
-              {estaDisponible && subtituloModalidad && (
-                <p className="text-[11px] font-medium text-gray-400 truncate mt-0.5">
-                  {subtituloModalidad}
+              {estaDisponible && (
+                <p
+                  className={`text-[11px] font-semibold truncate mt-0.5 ${
+                    envioActivo ? 'text-gray-400' : 'text-amber-400'
+                  }`}
+                >
+                  {envioActivo
+                    ? 'Envío a domicilio habilitado'
+                    : 'Envío a domicilio deshabilitado'}
                 </p>
               )}
             </div>
@@ -78,7 +90,7 @@ const HeaderTienda = ({
               )}
             </div>
 
-            <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+            <div className="flex gap-2 overflow-x-auto py-1.5 px-0.5 no-scrollbar">
               {tabsVisibles.map((cat) => {
                 const activa = categoriaActiva === cat.id;
                 return (
@@ -86,10 +98,8 @@ const HeaderTienda = ({
                     key={cat.id}
                     type="button"
                     onClick={() => onSeleccionarCategoria(cat.id)}
-                    className={`px-3.5 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer ${
-                      activa
-                        ? 'bg-gradient-to-r from-orange-600 to-orange-500 text-white shadow-md shadow-orange-600/25'
-                        : 'bg-[#12151d] text-gray-400 hover:text-white hover:bg-[#171a24] border border-white/10 hover:border-white/20'
+                    className={`my-0.5 px-3.5 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider whitespace-nowrap transition-all duration-200 select-none cursor-pointer ${
+                      activa ? ESTILO_TAB_ACTIVA : ESTILO_TAB_INACTIVA
                     }`}
                   >
                     {cat.label}

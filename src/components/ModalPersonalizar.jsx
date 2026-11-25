@@ -66,15 +66,23 @@ const ModalPersonalizar = ({
   const precioUnitarioFinal = precioBase + totalAdicionales;
 
   const handleConfirmar = () => {
+    const tieneIngredientesConfigurables = Object.keys(ingredientesEstado).length > 0;
+
     const sinIngredientes = Object.entries(ingredientesEstado)
       .filter(([, activo]) => !activo)
       .map(([ing]) => `SIN ${ing.toUpperCase()}`);
+
+    const notasIngredientes = tieneIngredientesConfigurables
+      ? sinIngredientes.length > 0
+        ? sinIngredientes
+        : ['COMPLETO']
+      : [];
 
     const extrasAplicados = Object.entries(agregados).map(([nombreExtra, cant]) =>
       cant > 1 ? `+${cant} ${nombreExtra.toUpperCase()}` : `+${nombreExtra.toUpperCase()}`
     );
 
-    const notas = [...sinIngredientes, ...extrasAplicados];
+    const notas = [...notasIngredientes, ...extrasAplicados];
 
     onConfirmarPersonalizado({
       producto,

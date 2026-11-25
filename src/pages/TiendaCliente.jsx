@@ -333,7 +333,7 @@ const TiendaCliente = () => {
       <HeaderTienda
         tiendaAbierta={configWeb.tiendaAbierta}
         sinSistema={errorCarga || cargando}
-        subtituloModalidad={subtituloModalidad}
+        envioActivo={configWeb.envioActivo}
         busqueda={busqueda}
         onChangeBusqueda={setBusqueda}
         tabsVisibles={tabsVisibles}
@@ -371,8 +371,8 @@ const TiendaCliente = () => {
                 <div
                   key={`${prod.clase}-${prod.id}`}
                   className={`relative rounded-2xl ${sinStock
-                      ? 'opacity-50 grayscale-[45%] pointer-events-none select-none'
-                      : ''
+                    ? 'opacity-50 grayscale-[45%] pointer-events-none select-none'
+                    : ''
                     }`}
                 >
                   {sinStock && (
