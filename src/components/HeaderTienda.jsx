@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, X, Download, Share } from 'lucide-react';
 import logo from '../assets/logo1.png';
-import { useInstalarPWA } from '../hooks/useInsatalarPWA';
+import { useInstalarPWA } from '../hooks/useInstalarPWA';
 
 const ESTILO_TAB_ACTIVA =
   'bg-gradient-to-b from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-zinc-950 border border-amber-200/50 shadow-md shadow-amber-500/20 hover:shadow-lg hover:shadow-amber-400/30 -translate-y-0.5 active:translate-y-0 active:scale-[0.97]';
@@ -50,10 +50,11 @@ const HeaderTienda = ({
   return (
     <>
       <header className="sticky top-0 z-30 bg-[#090a0d]/95 backdrop-blur-md border-b border-white/10 shadow-lg shadow-black/40">
-        <div className="max-w-4xl mx-auto px-4 py-3.5 space-y-3">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-11 h-11 rounded-xl bg-[#12151d] border border-orange-500/25 p-1 flex items-center justify-center shrink-0 shadow-inner">
+        <div className="max-w-4xl mx-auto px-4 py-4 sm:py-4.5 space-y-3.5">
+          {/* Fila 1: Logo, título y estado */}
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <div className="w-12 h-12 rounded-xl bg-[#12151d] border border-orange-500/25 p-1 flex items-center justify-center shrink-0 shadow-inner">
                 <img
                   src={logo}
                   alt="Logo Bar Los Primos"
@@ -61,7 +62,7 @@ const HeaderTienda = ({
                 />
               </div>
 
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <h1 className="text-base sm:text-lg font-black uppercase tracking-tight text-white truncate leading-tight">
                   Bar Los Primos
                 </h1>
@@ -72,39 +73,43 @@ const HeaderTienda = ({
                     }`}
                   >
                     {envioActivo
-                      ? 'Envío a domicilio disponible'
-                      : 'Envío a domicilio no disponible'}
+                      ? 'Envío a domicilio habilitado'
+                      : 'Envío a domicilio deshabilitado'}
                   </p>
                 )}
               </div>
             </div>
 
-            <div className="flex items-center gap-2 py-0.5 shrink-0">
-              {mostrarBoton && (
-                <button
-                  type="button"
-                  disabled={instalando}
-                  onClick={handleClickInstalar}
-                  className="my-0.5 inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider px-3 py-1.5 rounded-full bg-gradient-to-b from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 disabled:opacity-60 text-zinc-950 border border-amber-200/50 shadow-md shadow-amber-500/20 active:scale-95 transition-all cursor-pointer disabled:cursor-not-allowed"
-                >
-                  <Download size={12} strokeWidth={2.8} />
-                  <span>{instalando ? 'Instalando...' : 'Instalar App'}</span>
-                </button>
-              )}
-
-              {estaDisponible ? (
-                <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider px-3 py-1.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  Abierto
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider px-3 py-1.5 rounded-full bg-red-500/15 text-red-400 border border-red-500/30">
-                  <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
-                  Cerrado
-                </span>
-              )}
-            </div>
+            {estaDisponible ? (
+              <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider px-3 py-1.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shrink-0">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                Abierto
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider px-3 py-1.5 rounded-full bg-red-500/15 text-red-400 border border-red-500/30 shrink-0">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+                Cerrado
+              </span>
+            )}
           </div>
+
+          {/* Fila 2: Barra de acceso directo PWA debajo del encabezado */}
+          {mostrarBoton && (
+            <div className="flex items-center justify-between gap-3 px-3.5 py-2 rounded-xl bg-[#12151d]/90 border border-amber-500/20">
+              <span className="text-[11px] font-semibold text-gray-300 truncate">
+                Pedí más rápido desde tu inicio
+              </span>
+              <button
+                type="button"
+                disabled={instalando}
+                onClick={handleClickInstalar}
+                className="my-0.5 inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider px-3.5 py-1.5 rounded-xl bg-gradient-to-b from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 disabled:opacity-60 text-zinc-950 border border-amber-200/50 shadow-md shadow-amber-500/20 active:scale-95 transition-all cursor-pointer disabled:cursor-not-allowed shrink-0"
+              >
+                <Download size={12} strokeWidth={2.8} />
+                <span>{instalando ? 'Instalando...' : 'Instalar App'}</span>
+              </button>
+            </div>
+          )}
 
           {estaDisponible && (
             <>
