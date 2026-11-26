@@ -11,7 +11,13 @@ const CATEGORIAS = [
   'bebidas'
 ];
 
-const CATEGORIAS_SIN_PERSONALIZAR = new Set(['pizzas', 'papas', 'platos', 'bebidas']);
+const CATEGORIAS_SIN_PERSONALIZAR = new Set([
+  'pizzas',
+  'papas',
+  'platos',
+  'empanadas',
+  'bebidas'
+]);
 const CATEGORIAS_SANDWICH = new Set(['hamburguesas', 'lomitos', 'milanesas']);
 
 const INGREDIENTES_SANDWICH_COMUN = ['ají', 'mayonesa', 'mostaza', 'tomate', 'lechuga'];
@@ -53,11 +59,13 @@ const exigirApiUrl = () => {
 
 export const apiCliente = {
   esPersonalizable(clase) {
-    return !CATEGORIAS_SIN_PERSONALIZAR.has(String(clase || '').toLowerCase());
+    return !CATEGORIAS_SIN_PERSONALIZAR.has(
+      String(clase || '').trim().toLowerCase()
+    );
   },
 
   obtenerIngredientesSugeridos(clase, nombreProducto = '') {
-    const categoria = String(clase || '').toLowerCase();
+    const categoria = String(clase || '').trim().toLowerCase();
     if (!this.esPersonalizable(categoria)) return [];
 
     if (CATEGORIAS_SANDWICH.has(categoria)) {
@@ -69,15 +77,11 @@ export const apiCliente = {
       return esEspecial ? INGREDIENTES_SANDWICH_ESPECIAL : INGREDIENTES_SANDWICH_COMUN;
     }
 
-    if (categoria === 'empanadas') {
-      return ['cebolla', 'aceituna', 'huevo'];
-    }
-
     return INGREDIENTES_SANDWICH_COMUN;
   },
 
   obtenerAdicionalesPorCategoria(clase, adicionalesDB = []) {
-    const categoria = String(clase || '').toLowerCase();
+    const categoria = String(clase || '').trim().toLowerCase();
     if (categoria === 'platos') return [];
 
     if (categoria === 'papas') {
