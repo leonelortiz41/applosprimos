@@ -11,18 +11,138 @@ import EstadoSinSistema from '../components/EstadoSinSistema';
 
 const API_URL = import.meta.env.VITE_API_URL;
 const CONFIG_STORAGE_KEY = 'bar_los_primos_config_web_v1';
+const MESA_SESSION_KEY = 'bar_los_primos_mesa_activa';
+const TIEMPO_EXPIRACION_MESA_MS = 4 * 60 * 60 * 1000;
 
 const CATEGORIAS_TABS = [
   { id: 'todas', label: 'Todas' },
+  { id: 'platos', label: 'Platos' },
   { id: 'hamburguesas', label: 'Hamburguesas' },
   { id: 'milanesas', label: 'Milanesas' },
   { id: 'lomitos', label: 'Lomitos' },
   { id: 'pizzas', label: 'Pizzas' },
   { id: 'empanadas', label: 'Empanadas' },
   { id: 'papas', label: 'Papas' },
-  { id: 'platos', label: 'Platos' },
   { id: 'bebidas', label: 'Bebidas' }
 ];
+
+const limpiarParametrosMesaEnUrl = () => {
+  if (typeof window === 'undefined' || !window.history?.replaceState) return;
+  const url = new URL(window.location.href);
+  let modificada = false;
+  for (const clave of ['mesa', 'token', 'modo']) {
+    if (url.searchParams.has(clave)) {
+      url.searchParams.delete(clave);
+      modificada = true;
+    }
+  }
+  if (modificada) {
+    const nuevaUrl = `${url.pathname}${url.search}${url.hash}`;
+    window.history.replaceState({}, '', nuevaUrl);
+  }
+};
+
+const borrarSesionMesa = () => {
+  try {
+    sessionStorage.removeItem(MESA_SESSION_KEY);
+  } catch {
+    // Ignorar si no hay acceso a sessionStorage
+  }
+};
+
+const guardarSesionMesa = (numero, token = '') => {
+  try {
+    sessionStorage.setItem(
+      MESA_SESSION_KEY,
+      JSON.stringify({
+        numero,
+        token: String(token || '').trim(),
+        guardadoEn: Date.now()
+      })
+    );
+  } catch {
+    // Ignorar si no hay acceso a sessionStorage
+  }
+};
+
+const leerSesionMesaInicial = () => {
+  if (typeof window === 'undefined') return { mesa: null, token: '' };
+
+  const params = new URLSearchParams(window.location.search);
+  const rawMesa = params.get('mesa');
+  const rawTokenUrl = String(params.get('token') || '').trim();
+  const forzarWeb = params.get('modo') === 'web';
+
+  limpiarParametrosMesaEnUrl();
+
+  if (forzarWeb) {
+    borrarSesionMesa();
+    return { mesa: null, token: '' };
+  }
+
+  let sesionPrevia = null;
+  try {
+    const rawGuardada = sessionStorage.getItem(MESA_SESSION_KEY);
+    if (rawGuardada) {
+      const parsed = JSON.parse(rawGuardada);
+      const numeroGuardado = Number.parseInt(parsed?.numero, 10);
+      const guardadoEn = Number(parsed?.guardadoEn) || 0;
+      const tokenGuardado = String(parsed?.token || '').trim();
+
+      if (Date.now() - guardadoEn > TIEMPO_EXPIRACION_MESA_MS) {
+        borrarSesionMesa();
+      } else if (
+        Number.isInteger(numeroGuardado) &&
+        numeroGuardado > 0 &&
+        numeroGuardado <= 200 &&
+        tokenGuardado
+      ) {
+        sesionPrevia = {
+          mesa: numeroGuardado,
+          token: tokenGuardado
+        };
+      } else {
+        borrarSesionMesa();
+      }
+    }
+  } catch {
+    // Ignorar si no hay acceso a sessionStorage
+  }
+
+  if (rawMesa !== null) {
+    const limpia = String(rawMesa).trim().replace(/^#/, '');
+    const numero = Number.parseInt(limpia, 10);
+    if (Number.isInteger(numero) && numero > 0 && numero <= 200) {
+      if (!rawTokenUrl) {
+        borrarSesionMesa();
+        return { mesa: null, token: '' };
+      }
+      guardarSesionMesa(numero, rawTokenUrl);
+      return { mesa: numero, token: rawTokenUrl };
+    }
+    borrarSesionMesa();
+    return { mesa: null, token: '' };
+  }
+
+  if (sesionPrevia) {
+    return sesionPrevia;
+  }
+
+  return { mesa: null, token: '' };
+};
+
+const extraerTokenMesaDesdeConfig = (data = {}, numeroMesa = null) => {
+  if (!numeroMesa || !data || typeof data !== 'object') return '';
+  const mapaTokens = data.tokensMesa || data.tokens_mesa;
+  if (mapaTokens && typeof mapaTokens === 'object') {
+    const porMesa = mapaTokens[String(numeroMesa)] ?? mapaTokens[numeroMesa];
+    if (porMesa != null && String(porMesa).trim()) {
+      return String(porMesa).trim();
+    }
+  }
+  const tokenGeneral = data.tokenMesa ?? data.token_mesa ?? data.tokenTurno ?? '';
+  return String(tokenGeneral).trim();
+};
 
 const construirClaveItem = (id, clase, notas = []) => {
   const base = `${clase}-${id}`;
@@ -71,6 +191,10 @@ const normalizarConfigWeb = (data = {}, baseActual = {}) => ({
 
 const TiendaCliente = () => {
   const cacheInicial = leerConfigCache();
+  const sesionInicial = leerSesionMesaInicial();
+
+  const [mesa, setMesa] = useState(sesionInicial.mesa);
+  const [tokenMesa, setTokenMesa] = useState(sesionInicial.token);
 
   const [productos, setProductos] = useState([]);
   const [adicionalesDB, setAdicionalesDB] = useState([]);
@@ -89,6 +213,12 @@ const TiendaCliente = () => {
   const [enviando, setEnviando] = useState(false);
   const [pedidoConfirmado, setPedidoConfirmado] = useState(null);
 
+  const handleSalirMesa = useCallback(() => {
+    borrarSesionMesa();
+    setMesa(null);
+    setTokenMesa('');
+  }, []);
+
   const cargarConfigWeb = useCallback(async () => {
     if (!API_URL) return null;
 
@@ -102,6 +232,15 @@ const TiendaCliente = () => {
       });
       if (!res.ok) return null;
       const data = await res.json();
+
+      if (mesa) {
+        const tokenVigente = extraerTokenMesaDesdeConfig(data, mesa);
+        if (tokenVigente) {
+          setTokenMesa(tokenVigente);
+          guardarSesionMesa(mesa, tokenVigente);
+        }
+      }
+
       let actualizada = null;
       setConfigWeb((prev) => {
         actualizada = normalizarConfigWeb(data, prev);
@@ -120,7 +259,7 @@ const TiendaCliente = () => {
     } finally {
       clearTimeout(timeoutId);
     }
-  }, []);
+  }, [mesa]);
 
   const cargarMenu = useCallback(async () => {
     setCargando(true);
@@ -282,15 +421,33 @@ const TiendaCliente = () => {
       return;
     }
 
+    const esMesa = Boolean(mesa);
+    const tipoEntregaFinal = esMesa ? 'MESA' : datosCliente.tipoEntrega;
+    const tokenActivo = esMesa
+      ? (configFresca ? extraerTokenMesaDesdeConfig(configFresca, mesa) : '') || tokenMesa
+      : null;
+
+    if (esMesa && !tokenActivo) {
+      alert(
+        'No se pudo validar el código de la mesa. Escaneá el QR de la mesa o pedí como envío/retiro.'
+      );
+      return;
+    }
+
     setEnviando(true);
     try {
       await apiCliente.crearPedido({
         ...datosCliente,
-        origen: 'WEB',
+        tipoEntrega: tipoEntregaFinal,
+        mesa: esMesa ? mesa : null,
+        token: esMesa ? tokenActivo : null,
+        origen: esMesa ? 'MESA_QR' : 'WEB',
         carrito
       });
       setPedidoConfirmado({
         ...datosCliente,
+        tipoEntrega: tipoEntregaFinal,
+        mesa: esMesa ? mesa : null,
         total: totalCarrito,
         cantidad: cantidadTotal
       });
@@ -311,13 +468,19 @@ const TiendaCliente = () => {
 
   const subtituloModalidad = useMemo(() => {
     if (!configWeb.tiendaAbierta) return 'Pedidos online no disponibles';
+    if (mesa) return `Consumo en el local · Mesa #${mesa}`;
     if (configWeb.envioActivo && configWeb.retiroActivo) {
       return 'Retiro en local o envío a domicilio';
     }
     if (configWeb.envioActivo) return 'Envío a domicilio disponible';
     if (configWeb.retiroActivo) return 'Retiro en local disponible';
     return 'Consultá disponibilidad';
-  }, [configWeb.tiendaAbierta, configWeb.envioActivo, configWeb.retiroActivo]);
+  }, [
+    configWeb.tiendaAbierta,
+    configWeb.envioActivo,
+    configWeb.retiroActivo,
+    mesa
+  ]);
 
   if (pedidoConfirmado) {
     return (
@@ -334,6 +497,9 @@ const TiendaCliente = () => {
         tiendaAbierta={configWeb.tiendaAbierta}
         sinSistema={errorCarga || cargando}
         envioActivo={configWeb.envioActivo}
+        subtitulo={subtituloModalidad}
+        mesa={mesa}
+        onSalirMesa={handleSalirMesa}
         busqueda={busqueda}
         onChangeBusqueda={setBusqueda}
         tabsVisibles={tabsVisibles}
@@ -370,10 +536,11 @@ const TiendaCliente = () => {
               return (
                 <div
                   key={`${prod.clase}-${prod.id}`}
-                  className={`relative rounded-2xl ${sinStock
-                    ? 'opacity-50 grayscale-[45%] pointer-events-none select-none'
-                    : ''
-                    }`}
+                  className={`relative rounded-2xl ${
+                    sinStock
+                      ? 'opacity-50 grayscale-[45%] pointer-events-none select-none'
+                      : ''
+                  }`}
                 >
                   {sinStock && (
                     <span className="absolute top-3 right-3 z-10 bg-red-600/90 text-white border border-red-300/30 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider">
@@ -439,6 +606,7 @@ const TiendaCliente = () => {
         abierto={checkoutAbierto}
         onCerrar={() => setCheckoutAbierto(false)}
         carrito={carrito}
+        mesa={mesa}
         envioActivo={configWeb.envioActivo}
         retiroActivo={configWeb.retiroActivo}
         onConfirmarPedido={handleConfirmarPedido}

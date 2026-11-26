@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, X, Download, Share } from 'lucide-react';
+import { Search, X, Download, Share, UtensilsCrossed } from 'lucide-react';
 import logo from '../assets/logo1.png';
 import { useInstalarPWA } from '../hooks/useInstalarPWA';
 
@@ -29,16 +29,25 @@ const esTabGeneral = (cat) => {
   );
 };
 
+const normalizarMesaVisible = (mesa) => {
+  const num = Number(mesa);
+  return Number.isInteger(num) && num > 0 ? num : null;
+};
+
 const HeaderTienda = ({
   tiendaAbierta,
   sinSistema = false,
   envioActivo = true,
+  subtitulo,
+  mesa = null,
+  onSalirMesa = null,
   busqueda,
   onChangeBusqueda,
   tabsVisibles = [],
   categoriaActiva,
   onSeleccionarCategoria
 }) => {
+  const mesaActiva = normalizarMesaVisible(mesa);
   const estaDisponible = Boolean(tiendaAbierta) && !sinSistema;
   const { mostrarBoton, esIOS, instalarApp } = useInstalarPWA();
   const [mostrarGuiaIOS, setMostrarGuiaIOS] = useState(false);
@@ -82,12 +91,20 @@ const HeaderTienda = ({
     }
   };
 
+  const textoSubtitulo =
+    subtitulo ||
+    (mesaActiva
+      ? `Consumo en el local · Mesa #${mesaActiva}`
+      : envioActivo
+        ? 'Envío a domicilio habilitado'
+        : 'Envío a domicilio deshabilitado');
+
   return (
     <>
       <header className="sticky top-0 z-30 bg-[#090a0d]/95 backdrop-blur-md border-b border-white/10 shadow-lg shadow-black/40">
         <div className="max-w-4xl mx-auto px-4 py-4 sm:py-4.5 space-y-3.5">
-          {/* Fila 1: Logo, título y estado */}
-          <div className="flex items-center justify-between gap-3">
+          {/* Fila 1: Logo, título, mesa y estado */}
+          <div className="flex items-center justify-between gap-2.5">
             <div className="flex items-center gap-3 min-w-0 flex-1">
               <div className="w-12 h-12 rounded-xl bg-[#12151d] border border-orange-500/25 p-1 flex items-center justify-center shrink-0 shadow-inner">
                 <img
@@ -104,28 +121,47 @@ const HeaderTienda = ({
                 {estaDisponible && (
                   <p
                     className={`text-[11px] font-semibold truncate mt-0.5 ${
-                      envioActivo ? 'text-gray-400' : 'text-amber-400'
+                      mesaActiva || !envioActivo ? 'text-amber-400' : 'text-gray-400'
                     }`}
                   >
-                    {envioActivo
-                      ? 'Envío a domicilio habilitado'
-                      : 'Envío a domicilio deshabilitado'}
+                    {textoSubtitulo}
                   </p>
                 )}
               </div>
             </div>
 
-            {estaDisponible ? (
-              <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider px-3 py-1.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shrink-0">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                Abierto
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider px-3 py-1.5 rounded-full bg-red-500/15 text-red-400 border border-red-500/30 shrink-0">
-                <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
-                Cerrado
-              </span>
-            )}
+            <div className="flex items-center gap-1.5 shrink-0">
+              {mesaActiva && estaDisponible && (
+                <div className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 border border-amber-400/35 pl-2.5 pr-1 py-1">
+                  <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-amber-300 tabular-nums">
+                    <UtensilsCrossed size={11} strokeWidth={2.5} />
+                    Mesa #{mesaActiva}
+                  </span>
+                  {typeof onSalirMesa === 'function' && (
+                    <button
+                      type="button"
+                      onClick={onSalirMesa}
+                      title="Cambiar a envío o retiro"
+                      className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-black/40 hover:bg-black/70 text-amber-200 hover:text-white transition-colors cursor-pointer"
+                    >
+                      Salir
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {estaDisponible ? (
+                <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider px-3 py-1.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  Abierto
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider px-3 py-1.5 rounded-full bg-red-500/15 text-red-400 border border-red-500/30">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+                  Cerrado
+                </span>
+              )}
+            </div>
           </div>
 
           {/* Fila 2: Barra de acceso directo PWA */}
@@ -217,14 +253,14 @@ const HeaderTienda = ({
               </button>
             </div>
             <p className="text-xs text-gray-300 leading-relaxed">
-              1. Tocá el ícono{' '}
+1. Tocá el ícono{' '}
               <strong className="text-white inline-flex items-center gap-1">
                 <Share size={13} /> Compartir
               </strong>{' '}
               en la barra inferior de Safari.
             </p>
             <p className="text-xs text-gray-300 leading-relaxed">
-              2. Elegí{' '}
+2. Elegí{' '}
               <strong className="text-amber-400">&quot;Agregar a inicio&quot;</strong>{' '}
               para tener el acceso directo con el logo del bar.
             </p>

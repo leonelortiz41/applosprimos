@@ -1,5 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { X, Store, Bike, CheckCircle2, ShieldCheck, AlertCircle } from 'lucide-react';
+import {
+  X,
+  Store,
+  Bike,
+  UtensilsCrossed,
+  CheckCircle2,
+  ShieldCheck,
+  AlertCircle
+} from 'lucide-react';
 
 const SECUENCIAS_PROHIBIDAS = [
   '1234567890',
@@ -39,12 +47,16 @@ const ModalCheckout = ({
   abierto,
   onCerrar,
   carrito = [],
+  mesa = null,
   envioActivo = true,
   retiroActivo = true,
   onConfirmarPedido,
   enviando = false
 }) => {
-  const [tipoEntrega, setTipoEntrega] = useState(envioActivo ? 'ENVIO' : 'RETIRO');
+  const esMesa = Boolean(mesa);
+  const [tipoEntrega, setTipoEntrega] = useState(
+    esMesa ? 'MESA' : envioActivo ? 'ENVIO' : 'RETIRO'
+  );
   const [cliente, setCliente] = useState('');
   const [telefono, setTelefono] = useState('');
   const [numeroConfirmado, setNumeroConfirmado] = useState(false);
@@ -58,27 +70,33 @@ const ModalCheckout = ({
 
   // Sincronizar modalidad válida al abrir o si cambia la config desde el POS
   useEffect(() => {
+    if (esMesa) {
+      setTipoEntrega('MESA');
+      return;
+    }
     if (!envioActivo && retiroActivo) {
       setTipoEntrega('RETIRO');
     } else if (envioActivo && !retiroActivo) {
       setTipoEntrega('ENVIO');
     } else if (envioActivo && abierto) {
-      setTipoEntrega((prev) => prev || 'ENVIO');
+      setTipoEntrega((prev) => (prev === 'MESA' || !prev ? 'ENVIO' : prev));
     }
-  }, [envioActivo, retiroActivo, abierto]);
+  }, [esMesa, envioActivo, retiroActivo, abierto]);
 
   if (!abierto) return null;
 
-  const sinModalidadDisponible = !envioActivo && !retiroActivo;
+  const sinModalidadDisponible = !esMesa && !envioActivo && !retiroActivo;
 
   const totalPedido = carrito.reduce(
     (acc, item) => acc + (Number(item.precioUnitario ?? item.precio) || 0) * item.cantidad,
     0
   );
 
-  const telefonoFormatoOk = esTelefonoValido(telefono);
+  const telefonoLimpio = telefono.trim();
+  const telefonoFormatoOk = esTelefonoValido(telefonoLimpio);
 
   const handleSeleccionarEntrega = (modalidad) => {
+    if (esMesa) return;
     if (modalidad === 'ENVIO' && !envioActivo) return;
     if (modalidad === 'RETIRO' && !retiroActivo) return;
     setTipoEntrega(modalidad);
@@ -94,14 +112,16 @@ const ModalCheckout = ({
       return;
     }
 
-    if (tipoEntrega === 'ENVIO' && !envioActivo) {
-      setError('El envío a domicilio se encuentra deshabilitado en este momento.');
-      return;
-    }
+    if (!esMesa) {
+      if (tipoEntrega === 'ENVIO' && !envioActivo) {
+        setError('El envío a domicilio se encuentra deshabilitado en este momento.');
+        return;
+      }
 
-    if (tipoEntrega === 'RETIRO' && !retiroActivo) {
-      setError('El retiro en local se encuentra deshabilitado en este momento.');
-      return;
+      if (tipoEntrega === 'RETIRO' && !retiroActivo) {
+        setError('El retiro en local se encuentra deshabilitado en este momento.');
+        return;
+      }
     }
 
     if (!cliente.trim() || cliente.trim().length < 2) {
@@ -109,26 +129,29 @@ const ModalCheckout = ({
       return;
     }
 
-    if (!telefonoFormatoOk) {
-      setError('Ingresá un número de teléfono real con código de área (ej. 381 555 1234).');
-      return;
-    }
+    if (!esMesa) {
+      if (!telefonoFormatoOk) {
+        setError('Ingresá un número de teléfono real con código de área (ej. 381 555 1234).');
+        return;
+      }
 
-    if (!numeroConfirmado) {
-      setError('Confirmá que el número ingresado es correcto para poder tomar el pedido.');
-      return;
-    }
+      if (!numeroConfirmado) {
+        setError('Confirmá que el número ingresado es correcto para poder tomar el pedido.');
+        return;
+      }
 
-    if (tipoEntrega === 'ENVIO' && (!direccion.trim() || direccion.trim().length < 4)) {
-      setError('Ingresá la dirección de entrega para el envío a domicilio.');
-      return;
+      if (tipoEntrega === 'ENVIO' && (!direccion.trim() || direccion.trim().length < 4)) {
+        setError('Ingresá la dirección de entrega para el envío a domicilio.');
+        return;
+      }
     }
 
     await onConfirmarPedido({
       cliente: cliente.trim(),
-      telefono: telefono.trim(),
-      tipoEntrega,
-      direccion: tipoEntrega === 'ENVIO' ? direccion.trim() : '',
+      telefono: esMesa ? '' : telefonoLimpio,
+      tipoEntrega: esMesa ? 'MESA' : tipoEntrega,
+      mesa: esMesa ? Number(mesa) : null,
+      direccion: !esMesa && tipoEntrega === 'ENVIO' ? direccion.trim() : '',
       honeypot
     });
   };
@@ -143,6 +166,7 @@ const ModalCheckout = ({
             </h2>
             <p className="text-[11px] text-gray-400">
               Bar Los Primos · {carrito.reduce((a, b) => a + b.cantidad, 0)} ítems
+              {esMesa ? ` · Mesa #${mesa}` : ''}
             </p>
           </div>
           <button
@@ -168,87 +192,103 @@ const ModalCheckout = ({
             className="hidden"
           />
 
-          {/* Selector Envío vs Retiro */}
-          <div className="space-y-2">
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                disabled={!envioActivo}
-                onClick={() => handleSeleccionarEntrega('ENVIO')}
-                className={`p-3 rounded-2xl border text-left transition-colors flex items-center gap-2.5 ${
-                  !envioActivo
-                    ? 'bg-black/25 border-white/5 text-gray-600 opacity-55 cursor-not-allowed'
-                    : tipoEntrega === 'ENVIO'
-                    ? 'bg-orange-600/20 border-orange-500 text-white cursor-pointer'
-                    : 'bg-black/40 border-white/10 text-gray-400 hover:text-white cursor-pointer'
-                }`}
-              >
-                <Bike
-                  size={18}
-                  className={envioActivo && tipoEntrega === 'ENVIO' ? 'text-orange-400' : ''}
-                />
-                <div className="min-w-0">
-                  <div className="text-xs font-black uppercase">Envío</div>
-                  <div className="text-[10px] opacity-75 truncate">
-                    {envioActivo ? 'A domicilio' : 'No disponible'}
-                  </div>
+          {/* Modalidad: Mesa fija o Selector Envío vs Retiro */}
+          {esMesa ? (
+            <div className="p-3.5 rounded-2xl bg-amber-500/12 border border-amber-400/35 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-400/30 flex items-center justify-center shrink-0">
+                <UtensilsCrossed size={18} className="text-amber-300" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-xs font-black uppercase tracking-wider text-amber-300">
+                  Consumo en Mesa #{mesa}
                 </div>
-              </button>
-
-              <button
-                type="button"
-                disabled={!retiroActivo}
-                onClick={() => handleSeleccionarEntrega('RETIRO')}
-                className={`p-3 rounded-2xl border text-left transition-colors flex items-center gap-2.5 ${
-                  !retiroActivo
-                    ? 'bg-black/25 border-white/5 text-gray-600 opacity-55 cursor-not-allowed'
-                    : tipoEntrega === 'RETIRO'
-                    ? 'bg-orange-600/20 border-orange-500 text-white cursor-pointer'
-                    : 'bg-black/40 border-white/10 text-gray-400 hover:text-white cursor-pointer'
-                }`}
-              >
-                <Store
-                  size={18}
-                  className={retiroActivo && tipoEntrega === 'RETIRO' ? 'text-orange-400' : ''}
-                />
-                <div className="min-w-0">
-                  <div className="text-xs font-black uppercase">Retiro</div>
-                  <div className="text-[10px] opacity-75 truncate">
-                    {retiroActivo ? 'En el local' : 'No disponible'}
-                  </div>
-                </div>
-              </button>
+                <p className="text-[11px] text-gray-300 leading-snug mt-0.5">
+                  Tu pedido se enviará directo a caja identificado con tu mesa.
+                </p>
+              </div>
             </div>
+          ) : (
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  disabled={!envioActivo}
+                  onClick={() => handleSeleccionarEntrega('ENVIO')}
+                  className={`p-3 rounded-2xl border text-left transition-colors flex items-center gap-2.5 ${
+                    !envioActivo
+                      ? 'bg-black/25 border-white/5 text-gray-600 opacity-55 cursor-not-allowed'
+                      : tipoEntrega === 'ENVIO'
+                      ? 'bg-orange-600/20 border-orange-500 text-white cursor-pointer'
+                      : 'bg-black/40 border-white/10 text-gray-400 hover:text-white cursor-pointer'
+                  }`}
+                >
+                  <Bike
+                    size={18}
+                    className={envioActivo && tipoEntrega === 'ENVIO' ? 'text-orange-400' : ''}
+                  />
+                  <div className="min-w-0">
+                    <div className="text-xs font-black uppercase">Envío</div>
+                    <div className="text-[10px] opacity-75 truncate">
+                      {envioActivo ? 'A domicilio' : 'No disponible'}
+                    </div>
+                  </div>
+                </button>
 
-            {!envioActivo && retiroActivo && (
-              <p className="text-[11px] text-amber-300/90 bg-amber-500/10 border border-amber-500/25 rounded-xl px-3 py-2 flex items-center gap-2">
-                <AlertCircle size={14} className="shrink-0 text-amber-400" />
-                <span>
-                  El envío a domicilio está deshabilitado por el momento. Solo disponible para{' '}
-                  <strong className="font-black">retiro en el local</strong>.
-                </span>
-              </p>
-            )}
+                <button
+                  type="button"
+                  disabled={!retiroActivo}
+                  onClick={() => handleSeleccionarEntrega('RETIRO')}
+                  className={`p-3 rounded-2xl border text-left transition-colors flex items-center gap-2.5 ${
+                    !retiroActivo
+                      ? 'bg-black/25 border-white/5 text-gray-600 opacity-55 cursor-not-allowed'
+                      : tipoEntrega === 'RETIRO'
+                      ? 'bg-orange-600/20 border-orange-500 text-white cursor-pointer'
+                      : 'bg-black/40 border-white/10 text-gray-400 hover:text-white cursor-pointer'
+                  }`}
+                >
+                  <Store
+                    size={18}
+                    className={retiroActivo && tipoEntrega === 'RETIRO' ? 'text-orange-400' : ''}
+                  />
+                  <div className="min-w-0">
+                    <div className="text-xs font-black uppercase">Retiro</div>
+                    <div className="text-[10px] opacity-75 truncate">
+                      {retiroActivo ? 'En el local' : 'No disponible'}
+                    </div>
+                  </div>
+                </button>
+              </div>
 
-            {envioActivo && !retiroActivo && (
-              <p className="text-[11px] text-amber-300/90 bg-amber-500/10 border border-amber-500/25 rounded-xl px-3 py-2 flex items-center gap-2">
-                <AlertCircle size={14} className="shrink-0 text-amber-400" />
-                <span>
-                  El retiro en local está deshabilitado por el momento. Solo disponible con{' '}
-                  <strong className="font-black">envío a domicilio</strong>.
-                </span>
-              </p>
-            )}
+              {!envioActivo && retiroActivo && (
+                <p className="text-[11px] text-amber-300/90 bg-amber-500/10 border border-amber-500/25 rounded-xl px-3 py-2 flex items-center gap-2">
+                  <AlertCircle size={14} className="shrink-0 text-amber-400" />
+                  <span>
+                    El envío a domicilio está deshabilitado por el momento. Solo disponible para{' '}
+                    <strong className="font-black">retiro en el local</strong>.
+                  </span>
+                </p>
+              )}
 
-            {sinModalidadDisponible && (
-              <p className="text-[11px] text-red-300 bg-red-500/10 border border-red-500/30 rounded-xl px-3 py-2 flex items-center gap-2">
-                <AlertCircle size={14} className="shrink-0 text-red-400" />
-                <span>
-                  No hay modalidades de entrega activas en este momento.
-                </span>
-              </p>
-            )}
-          </div>
+              {envioActivo && !retiroActivo && (
+                <p className="text-[11px] text-amber-300/90 bg-amber-500/10 border border-amber-500/25 rounded-xl px-3 py-2 flex items-center gap-2">
+                  <AlertCircle size={14} className="shrink-0 text-amber-400" />
+                  <span>
+                    El retiro en local está deshabilitado por el momento. Solo disponible con{' '}
+                    <strong className="font-black">envío a domicilio</strong>.
+                  </span>
+                </p>
+              )}
+
+              {sinModalidadDisponible && (
+                <p className="text-[11px] text-red-300 bg-red-500/10 border border-red-500/30 rounded-xl px-3 py-2 flex items-center gap-2">
+                  <AlertCircle size={14} className="shrink-0 text-red-400" />
+                  <span>
+                    No hay modalidades de entrega activas en este momento.
+                  </span>
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Datos del cliente */}
           <div className="space-y-3">
@@ -266,62 +306,66 @@ const ModalCheckout = ({
               />
             </div>
 
-            <div>
-              <label className="block text-[11px] font-bold uppercase text-gray-400 mb-1">
-                Teléfono / WhatsApp *
-              </label>
-              <input
-                type="tel"
-                value={telefono}
-                onChange={(e) => setTelefono(e.target.value)}
-                placeholder="Ej. 381 555 1234"
-                maxLength={20}
-                className={`w-full bg-black/60 border rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-gray-600 outline-none transition-colors ${
-                  telefono && !telefonoFormatoOk
-                    ? 'border-red-500/70 focus:border-red-500'
-                    : 'border-white/15 focus:border-orange-500'
-                }`}
-              />
-              {telefono && !telefonoFormatoOk && (
-                <p className="text-[11px] text-red-400 mt-1">
-                  Revisá el número: debe tener código de área y no ser una secuencia o número ficticio.
-                </p>
-              )}
-
-              {telefonoFormatoOk && (
-                <label className="mt-2 p-2.5 rounded-xl bg-white/[0.04] border border-white/10 flex items-start gap-2.5 cursor-pointer select-none">
+            {!esMesa && (
+              <>
+                <div>
+                  <label className="block text-[11px] font-bold uppercase text-gray-400 mb-1">
+                    Teléfono / WhatsApp *
+                  </label>
                   <input
-                    type="checkbox"
-                    checked={numeroConfirmado}
-                    onChange={(e) => setNumeroConfirmado(e.target.checked)}
-                    className="mt-0.5 accent-orange-500 w-4 h-4 cursor-pointer"
+                    type="tel"
+                    value={telefono}
+                    onChange={(e) => setTelefono(e.target.value)}
+                    placeholder="Ej. 381 555 1234"
+                    maxLength={20}
+                    className={`w-full bg-black/60 border rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-gray-600 outline-none transition-colors ${
+                      telefonoLimpio && !telefonoFormatoOk
+                        ? 'border-red-500/70 focus:border-red-500'
+                        : 'border-white/15 focus:border-orange-500'
+                    }`}
                   />
-                  <span className="text-[11px] text-gray-200 leading-snug">
-                    <span className="inline-flex items-center gap-1 font-bold text-orange-300">
-                      <ShieldCheck size={13} /> Verifiqué mi número ({telefono.trim()})
-                    </span>
-                    <span className="block text-gray-400">
-                      Si el número es incorrecto o falso, el pedido no se tomará.
-                    </span>
-                  </span>
-                </label>
-              )}
-            </div>
+                  {telefonoLimpio && !telefonoFormatoOk && (
+                    <p className="text-[11px] text-red-400 mt-1">
+                      Revisá el número: debe tener código de área y no ser una secuencia o número ficticio.
+                    </p>
+                  )}
 
-            {tipoEntrega === 'ENVIO' && envioActivo && (
-              <div>
-                <label className="block text-[11px] font-bold uppercase text-gray-400 mb-1">
-                  Dirección de entrega *
-                </label>
-                <input
-                  type="text"
-                  value={direccion}
-                  onChange={(e) => setDireccion(e.target.value)}
-                  placeholder="Barrio, calle, número"
-                  maxLength={120}
-                  className="w-full bg-black/60 border border-white/15 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-gray-600 outline-none focus:border-orange-500"
-                />
-              </div>
+                  {telefonoFormatoOk && (
+                    <label className="mt-2 p-2.5 rounded-xl bg-white/[0.04] border border-white/10 flex items-start gap-2.5 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={numeroConfirmado}
+                        onChange={(e) => setNumeroConfirmado(e.target.checked)}
+                        className="mt-0.5 accent-orange-500 w-4 h-4 cursor-pointer"
+                      />
+                      <span className="text-[11px] text-gray-200 leading-snug">
+                        <span className="inline-flex items-center gap-1 font-bold text-orange-300">
+                          <ShieldCheck size={13} /> Verifiqué mi número ({telefonoLimpio})
+                        </span>
+                        <span className="block text-gray-400">
+                          Si el número es incorrecto o falso, el pedido no se tomará.
+                        </span>
+                      </span>
+                    </label>
+                  )}
+                </div>
+
+                {tipoEntrega === 'ENVIO' && envioActivo && (
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase text-gray-400 mb-1">
+                      Dirección de entrega *
+                    </label>
+                    <input
+                      type="text"
+                      value={direccion}
+                      onChange={(e) => setDireccion(e.target.value)}
+                      placeholder="Barrio, calle, número"
+                      maxLength={120}
+                      className="w-full bg-black/60 border border-white/15 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-gray-600 outline-none focus:border-orange-500"
+                    />
+                  </div>
+                )}
+              </>
             )}
           </div>
 
@@ -371,7 +415,11 @@ const ModalCheckout = ({
             className="w-full bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white py-3.5 rounded-2xl text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2 transition-transform active:scale-[0.99] cursor-pointer"
           >
             <CheckCircle2 size={16} />
-            {enviando ? 'Enviando pedido...' : `Enviar Pedido · $${totalPedido.toLocaleString('es-AR')}`}
+            {enviando
+              ? 'Enviando pedido...'
+              : esMesa
+              ? `Enviar a Caja · Mesa #${mesa} · $${totalPedido.toLocaleString('es-AR')}`
+              : `Enviar Pedido · $${totalPedido.toLocaleString('es-AR')}`}
           </button>
         </form>
       </div>

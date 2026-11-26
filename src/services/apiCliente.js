@@ -1,13 +1,13 @@
 const API_URL = import.meta.env.VITE_API_URL;
 
 const CATEGORIAS = [
+  'platos',
   'milanesas',
   'lomitos',
   'hamburguesas',
   'pizzas',
-  'papas',
-  'platos',
   'empanadas',
+  'papas',
   'bebidas'
 ];
 
@@ -152,11 +152,21 @@ export const apiCliente = {
     return productos;
   },
 
-  async crearPedido({ cliente, telefono, tipoEntrega, direccion, carrito }) {
+  async crearPedido({
+    cliente,
+    telefono,
+    tipoEntrega,
+    direccion,
+    mesa,
+    token,
+    origen,
+    carrito
+  }) {
     const baseUrl = exigirApiUrl();
     const cantidadTotal = carrito.reduce((acc, item) => acc + item.cantidad, 0);
     const importeTotal = carrito.reduce(
-      (acc, item) => acc + (Number(item.precioUnitario ?? item.precio) || 0) * item.cantidad,
+      (acc, item) =>
+        acc + (Number(item.precioUnitario ?? item.precio) || 0) * item.cantidad,
       0
     );
 
@@ -185,14 +195,34 @@ export const apiCliente = {
       .map((i) => `${i.cantidad}x ${i.nombre}`)
       .join(', ');
 
-    const sufijoEntrega =
-      tipoEntrega === 'ENVIO' ? `ENVÍO: ${direccion}` : 'RETIRO LOCAL';
+    const esMesa = tipoEntrega === 'MESA' || Boolean(mesa);
+    const nombreLimpio = (cliente || '').trim() || (esMesa ? 'CLIENTE EN MESA' : '');
+    const telLimpio = (telefono || '').trim();
+    const tokenLimpio = String(token || '').trim();
 
-    const etiquetaCliente = `[WEB] ${cliente.trim()} · ${telefono.trim()} · ${sufijoEntrega}`;
+    const sufijoEntrega = esMesa
+      ? `MESA #${mesa}`
+      : tipoEntrega === 'ENVIO'
+      ? `ENVÍO: ${direccion}`
+      : 'RETIRO LOCAL';
+
+    const prefijoCanal = esMesa ? `[MESA ${mesa}]` : '[WEB]';
+    const etiquetaCliente = [
+      prefijoCanal,
+      nombreLimpio,
+      telLimpio || null,
+      sufijoEntrega
+    ]
+      .filter(Boolean)
+      .join(' · ');
 
     const payload = {
       cantidad: cantidadTotal,
       cliente: etiquetaCliente,
+      mesa: esMesa ? Number(mesa) : null,
+      token: esMesa ? tokenLimpio : null,
+      origen: origen || (esMesa ? 'MESA_QR' : 'WEB'),
+      tipoEntrega: esMesa ? 'MESA' : tipoEntrega,
       pedido: itemsFormateados,
       detalle: detalleTicket,
       detalleTicket,
@@ -213,7 +243,14 @@ export const apiCliente = {
     );
 
     if (!res.ok) {
-      throw new Error('No se pudo registrar el pedido');
+      let mensajeError = 'No se pudo registrar el pedido';
+      try {
+        const errData = await res.json();
+        mensajeError = errData?.error || errData?.message || mensajeError;
+      } catch {
+        // Mantener mensaje por defecto si no hay JSON de error
+      }
+      throw new Error(mensajeError);
     }
 
     return res.json();

@@ -1,8 +1,15 @@
 import React from 'react';
-import { CheckCircle2, RotateCcw, MessageCircle } from 'lucide-react';
+import { CheckCircle2, RotateCcw, UtensilsCrossed, Clock } from 'lucide-react';
 
 const PedidoConfirmado = ({ pedido, onNuevoPedido }) => {
   if (!pedido) return null;
+
+  const esMesa = pedido.tipoEntrega === 'MESA' || Boolean(pedido.mesa);
+  const textoModalidad = esMesa
+    ? `Consumo en mesa · Mesa #${pedido.mesa}`
+    : pedido.tipoEntrega === 'ENVIO'
+      ? 'Envío a domicilio'
+      : 'Retiro en local';
 
   return (
     <div className="min-h-screen bg-[#090a0d] text-white flex items-center justify-center p-4">
@@ -19,27 +26,42 @@ const PedidoConfirmado = ({ pedido, onNuevoPedido }) => {
         </p>
 
         <div className="bg-emerald-500/10 border border-emerald-500/25 rounded-2xl p-3 text-xs text-emerald-200 flex items-center justify-center gap-2">
-          <MessageCircle size={16} className="text-emerald-400 shrink-0" />
-          <span>El cajero te confirmará tu pedido por WhatsApp brevemente.</span>
+          {esMesa ? (
+            <>
+              <UtensilsCrossed size={16} className="text-emerald-400 shrink-0" />
+              <span>
+                Tu comanda ya llegó a caja y se está preparando para la{' '}
+                <strong className="font-black text-white">Mesa #{pedido.mesa}</strong>.
+              </span>
+            </>
+          ) : (
+            <>
+              <Clock size={16} className="text-emerald-400 shrink-0" />
+              <span>
+                El cajero te confirmará tu pedido por WhatsApp brevemente.
+              </span>
+            </>
+          )}
         </div>
 
         <div className="bg-black/50 border border-white/10 rounded-2xl p-4 text-xs text-left space-y-1.5 text-gray-300">
           <div>
-            <strong className="text-white">Modalidad:</strong>{' '}
-            {pedido.tipoEntrega === 'ENVIO' ? 'Envío a domicilio' : 'Retiro en local'}
+            <strong className="text-white">Modalidad:</strong> {textoModalidad}
           </div>
-          {pedido.tipoEntrega === 'ENVIO' && (
+          {!esMesa && pedido.tipoEntrega === 'ENVIO' && pedido.direccion && (
             <div>
               <strong className="text-white">Dirección:</strong> {pedido.direccion}
             </div>
           )}
-          <div>
-            <strong className="text-white">Teléfono:</strong> {pedido.telefono}
-          </div>
+          {!esMesa && pedido.telefono && (
+            <div>
+              <strong className="text-white">Teléfono:</strong> {pedido.telefono}
+            </div>
+          )}
           <div>
             <strong className="text-white">Total:</strong>{' '}
             <span className="text-orange-400 font-black">
-              ${pedido.total.toLocaleString('es-AR')}
+              ${(Number(pedido.total) || 0).toLocaleString('es-AR')}
             </span>
           </div>
         </div>
