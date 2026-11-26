@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Search, X, Download, Share } from 'lucide-react';
 import logo from '../assets/logo1.png';
 import { useInstalarPWA } from '../hooks/useInstalarPWA';
@@ -8,6 +8,26 @@ const ESTILO_TAB_ACTIVA =
 
 const ESTILO_TAB_INACTIVA =
   'bg-[#12151d] text-gray-400 hover:text-white hover:bg-[#171a24] border border-white/10 hover:border-amber-400/35 active:scale-[0.98]';
+
+const ORDEN_CATEGORIAS = [
+  'platos',
+  'milanesas',
+  'lomitos',
+  'hamburguesas',
+  'pizzas',
+  'empanadas',
+  'papas',
+  'bebidas'
+];
+
+const esTabGeneral = (cat) => {
+  const id = String(cat.id || '').trim().toLowerCase();
+  const label = String(cat.label || '').trim().toLowerCase();
+  return (
+    ['todos', 'todas', 'todo', 'all'].includes(id) ||
+    ['todos', 'todas'].includes(label)
+  );
+};
 
 const HeaderTienda = ({
   tiendaAbierta,
@@ -23,6 +43,21 @@ const HeaderTienda = ({
   const { mostrarBoton, esIOS, instalarApp } = useInstalarPWA();
   const [mostrarGuiaIOS, setMostrarGuiaIOS] = useState(false);
   const [instalando, setInstalando] = useState(false);
+
+  const tabsOrdenadas = useMemo(() => {
+    return [...tabsVisibles].sort((a, b) => {
+      if (esTabGeneral(a)) return -1;
+      if (esTabGeneral(b)) return 1;
+
+      const idA = String(a.id || '').trim().toLowerCase();
+      const idB = String(b.id || '').trim().toLowerCase();
+      const idxA = ORDEN_CATEGORIAS.indexOf(idA);
+      const idxB = ORDEN_CATEGORIAS.indexOf(idB);
+      const posA = idxA === -1 ? 999 : idxA;
+      const posB = idxB === -1 ? 999 : idxB;
+      return posA - posB;
+    });
+  }, [tabsVisibles]);
 
   useEffect(() => {
     if (!mostrarGuiaIOS) return;
@@ -93,7 +128,7 @@ const HeaderTienda = ({
             )}
           </div>
 
-          {/* Fila 2: Barra de acceso directo PWA debajo del encabezado */}
+          {/* Fila 2: Barra de acceso directo PWA */}
           {mostrarBoton && (
             <div className="flex items-center justify-between gap-3 px-3.5 py-2 rounded-xl bg-[#12151d]/90 border border-amber-500/20">
               <span className="text-[11px] font-semibold text-gray-300 truncate">
@@ -138,7 +173,7 @@ const HeaderTienda = ({
               </div>
 
               <div className="flex gap-2 overflow-x-auto py-1.5 px-0.5 no-scrollbar">
-                {tabsVisibles.map((cat) => {
+                {tabsOrdenadas.map((cat) => {
                   const activa = categoriaActiva === cat.id;
                   return (
                     <button
