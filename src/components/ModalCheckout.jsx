@@ -19,22 +19,26 @@ const SECUENCIAS_PROHIBIDAS = [
   '12345678'
 ];
 
+const normalizarTelefonoAR = (tel = '') => {
+  let limpio = String(tel).replace(/\D/g, '');
+  if (limpio.startsWith('549')) limpio = limpio.slice(3);
+  else if (limpio.startsWith('54')) limpio = limpio.slice(2);
+  if (limpio.startsWith('0')) limpio = limpio.slice(1);
+  if (limpio.length === 12 && limpio.slice(3, 5) === '15') {
+    limpio = limpio.slice(0, 3) + limpio.slice(5);
+  }
+  return limpio;
+};
+
 const esTelefonoValido = (tel = '') => {
   const limpio = String(tel).replace(/\D/g, '');
-  if (limpio.length < 10 || limpio.length > 13) return false;
-  if (/^(.)\1+$/.test(limpio)) return false;
+  const normalizado = normalizarTelefonoAR(limpio);
 
-  const sinCodigoPais = limpio.startsWith('549')
-    ? limpio.slice(3)
-    : limpio.startsWith('54')
-    ? limpio.slice(2)
-    : limpio;
-
-  if (sinCodigoPais.length < 10) return false;
-  if (/^(.)\1+$/.test(sinCodigoPais)) return false;
+  if (normalizado.length < 10 || normalizado.length > 13) return false;
+  if (/^(.)\1+$/.test(limpio) || /^(.)\1+$/.test(normalizado)) return false;
   if (
     SECUENCIAS_PROHIBIDAS.some(
-      (seq) => limpio.includes(seq) || sinCodigoPais.includes(seq)
+      (seq) => limpio.includes(seq) || normalizado.includes(seq)
     )
   ) {
     return false;
@@ -93,6 +97,7 @@ const ModalCheckout = ({
   );
 
   const telefonoLimpio = telefono.trim();
+  const telefonoNormalizado = normalizarTelefonoAR(telefonoLimpio);
   const telefonoFormatoOk = esTelefonoValido(telefonoLimpio);
 
   const handleSeleccionarEntrega = (modalidad) => {
@@ -148,8 +153,9 @@ const ModalCheckout = ({
 
     await onConfirmarPedido({
       cliente: cliente.trim(),
-      telefono: esMesa ? '' : telefonoLimpio,
+      telefono: esMesa ? undefined : telefonoNormalizado,
       tipoEntrega: esMesa ? 'MESA' : tipoEntrega,
+      origen: esMesa ? 'MESA_QR' : 'WEB',
       mesa: esMesa ? Number(mesa) : null,
       direccion: !esMesa && tipoEntrega === 'ENVIO' ? direccion.trim() : '',
       honeypot
@@ -340,7 +346,7 @@ const ModalCheckout = ({
                       />
                       <span className="text-[11px] text-gray-200 leading-snug">
                         <span className="inline-flex items-center gap-1 font-bold text-orange-300">
-                          <ShieldCheck size={13} /> Verifiqué mi número ({telefonoLimpio})
+                          <ShieldCheck size={13} /> Verifiqué mi número ({telefonoNormalizado})
                         </span>
                         <span className="block text-gray-400">
                           Si el número es incorrecto o falso, el pedido no se tomará.

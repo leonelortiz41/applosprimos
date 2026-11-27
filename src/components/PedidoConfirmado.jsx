@@ -30,7 +30,7 @@ const PedidoConfirmado = ({ pedido, onNuevoPedido }) => {
             <>
               <UtensilsCrossed size={16} className="text-emerald-400 shrink-0" />
               <span>
-                Tu comanda ya llegó a caja y se está preparando para la{' '}
+                Tu pedido ya llegó a caja y se está preparando para la{' '}
                 <strong className="font-black text-white">Mesa #{pedido.mesa}</strong>.
               </span>
             </>

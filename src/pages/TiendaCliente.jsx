@@ -9,7 +9,8 @@ import BarraCarritoFlotante from '../components/BarraCarritoFlotante';
 import PedidoConfirmado from '../components/PedidoConfirmado';
 import EstadoSinSistema from '../components/EstadoSinSistema';
 
-const API_URL = import.meta.env.VITE_API_URL;
+const RAW_API_URL = import.meta.env.VITE_API_URL;
+const API_URL = RAW_API_URL ? String(RAW_API_URL).replace(/\/+$/, '') : '';
 const CONFIG_STORAGE_KEY = 'bar_los_primos_config_web_v1';
 const MESA_SESSION_KEY = 'bar_los_primos_mesa_activa';
 const TIEMPO_EXPIRACION_MESA_MS = 4 * 60 * 60 * 1000;
@@ -223,7 +224,7 @@ const TiendaCliente = () => {
     if (!API_URL || !numeroMesa || !tokenCandidato) return false;
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3500);
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
 
     try {
       const url = new URL(`${API_URL}/validar-mesa`);
@@ -268,7 +269,7 @@ const TiendaCliente = () => {
     if (!API_URL) return null;
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3500);
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
 
     try {
       const res = await fetch(`${API_URL}/configuracion-web`, {

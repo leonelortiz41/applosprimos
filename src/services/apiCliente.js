@@ -37,7 +37,7 @@ const ADICIONALES_BASE = [
   { id: 'def-6', atributo: 'PAPAS', valor: 0 }
 ];
 
-const fetchConTimeout = async (url, options = {}, ms = 3500) => {
+const fetchConTimeout = async (url, options = {}, ms = 8000) => {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), ms);
   try {
@@ -55,6 +55,20 @@ const exigirApiUrl = () => {
     throw new Error('VITE_API_URL no está configurada');
   }
   return API_URL.replace(/\/+$/, '');
+};
+
+const resolverUrlImagen = (imagen, baseUrl) => {
+  if (!imagen || typeof imagen !== 'string') return null;
+  const limpia = imagen.trim();
+  if (!limpia) return null;
+  if (
+    limpia.startsWith('http://') ||
+    limpia.startsWith('https://') ||
+    limpia.startsWith('data:')
+  ) {
+    return limpia;
+  }
+  return limpia.startsWith('/') ? `${baseUrl}${limpia}` : `${baseUrl}/${limpia}`;
 };
 
 export const apiCliente = {
@@ -97,7 +111,7 @@ export const apiCliente = {
   async obtenerAdicionales() {
     try {
       const baseUrl = exigirApiUrl();
-      const res = await fetchConTimeout(`${baseUrl}/configuracion`, {}, 3500);
+      const res = await fetchConTimeout(`${baseUrl}/configuracion`, {}, 8000);
       if (!res.ok) return ADICIONALES_BASE;
       const rows = await res.json();
       if (!Array.isArray(rows) || rows.length === 0) return ADICIONALES_BASE;
@@ -124,7 +138,7 @@ export const apiCliente = {
 
     const resultados = await Promise.allSettled(
       CATEGORIAS.map(async (clase) => {
-        const res = await fetchConTimeout(`${baseUrl}/${clase}`, {}, 3500);
+        const res = await fetchConTimeout(`${baseUrl}/${clase}`, {}, 8000);
         if (!res.ok) {
           console.warn(`Categoría "${clase}" no disponible (${res.status})`);
           return [];
@@ -136,6 +150,7 @@ export const apiCliente = {
           id: item.id,
           nombre: item.nombre,
           precio: Number(item.precio) || 0,
+          imagen: resolverUrlImagen(item.imagen, baseUrl),
           clase
         }));
       })
@@ -206,7 +221,7 @@ export const apiCliente = {
       ? `ENVÍO: ${direccion}`
       : 'RETIRO LOCAL';
 
-    const prefijoCanal = esMesa ? `[MESA ${mesa}]` : '[WEB]';
+    const prefijoCanal = esMesa ? '[MESA]' : '[WEB]';
     const etiquetaCliente = [
       prefijoCanal,
       nombreLimpio,
@@ -219,6 +234,7 @@ export const apiCliente = {
     const payload = {
       cantidad: cantidadTotal,
       cliente: etiquetaCliente,
+      telefono: esMesa ? undefined : telLimpio,
       mesa: esMesa ? Number(mesa) : null,
       token: esMesa ? tokenLimpio : null,
       origen: origen || (esMesa ? 'MESA_QR' : 'WEB'),
@@ -239,7 +255,7 @@ export const apiCliente = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       },
-      6000
+      10000
     );
 
     if (!res.ok) {
