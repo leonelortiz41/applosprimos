@@ -219,6 +219,51 @@ const TiendaCliente = () => {
     setTokenMesa('');
   }, []);
 
+  const verificarTokenMesaEnBackend = useCallback(async (numeroMesa, tokenCandidato) => {
+    if (!API_URL || !numeroMesa || !tokenCandidato) return false;
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3500);
+
+    try {
+      const url = new URL(`${API_URL}/validar-mesa`);
+      url.searchParams.set('mesa', String(numeroMesa));
+      url.searchParams.set('token', String(tokenCandidato));
+
+      const res = await fetch(url.toString(), {
+        signal: controller.signal,
+        cache: 'no-store'
+      });
+      if (!res.ok) return false;
+      const data = await res.json();
+      return Boolean(data?.valida);
+    } catch {
+      return false;
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!mesa) return;
+
+    let cancelado = false;
+    (async () => {
+      if (!tokenMesa) {
+        if (!cancelado) handleSalirMesa();
+        return;
+      }
+      const esValido = await verificarTokenMesaEnBackend(mesa, tokenMesa);
+      if (!cancelado && !esValido) {
+        handleSalirMesa();
+      }
+    })();
+
+    return () => {
+      cancelado = true;
+    };
+  }, [mesa, tokenMesa, verificarTokenMesaEnBackend, handleSalirMesa]);
+
   const cargarConfigWeb = useCallback(async () => {
     if (!API_URL) return null;
 
