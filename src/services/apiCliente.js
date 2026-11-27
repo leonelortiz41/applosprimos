@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL;
+const API_URL = String(import.meta.env.VITE_API_URL || '').trim();
 
 const CATEGORIAS = [
   'platos',
@@ -18,24 +18,9 @@ const CATEGORIAS_SIN_PERSONALIZAR = new Set([
   'empanadas',
   'bebidas'
 ]);
+
 const CATEGORIAS_SANDWICH = new Set(['hamburguesas', 'lomitos', 'milanesas']);
-
-const INGREDIENTES_SANDWICH_COMUN = ['ají', 'mayonesa', 'mostaza', 'tomate', 'lechuga'];
-const INGREDIENTES_SANDWICH_ESPECIAL = [
-  ...INGREDIENTES_SANDWICH_COMUN,
-  'huevo',
-  'jamón',
-  'queso'
-];
-
-const ADICIONALES_BASE = [
-  { id: 'def-1', atributo: 'CHEDDAR', valor: 0 },
-  { id: 'def-2', atributo: 'BACON', valor: 0 },
-  { id: 'def-3', atributo: 'HUEVO', valor: 0 },
-  { id: 'def-4', atributo: 'JAMÓN', valor: 0 },
-  { id: 'def-5', atributo: 'QUESO', valor: 0 },
-  { id: 'def-6', atributo: 'PAPAS', valor: 0 }
-];
+const INGREDIENTES_SANDWICH_BASE = ['ají', 'mayonesa', 'mostaza', 'tomate', 'lechuga'];
 
 const fetchConTimeout = async (url, options = {}, ms = 8000) => {
   const controller = new AbortController();
@@ -61,37 +46,26 @@ const resolverUrlImagen = (imagen, baseUrl) => {
   if (!imagen || typeof imagen !== 'string') return null;
   const limpia = imagen.trim();
   if (!limpia) return null;
-  if (
-    limpia.startsWith('http://') ||
-    limpia.startsWith('https://') ||
-    limpia.startsWith('data:')
-  ) {
-    return limpia;
-  }
+  if (/^(https?:\/\/|data:image\/)/i.test(limpia)) return limpia;
   return limpia.startsWith('/') ? `${baseUrl}${limpia}` : `${baseUrl}/${limpia}`;
 };
 
 export const apiCliente = {
+  resolverImagenUrl(imagen) {
+    if (!API_URL) return '';
+    return resolverUrlImagen(imagen, API_URL.replace(/\/+$/, '')) || '';
+  },
+
   esPersonalizable(clase) {
     return !CATEGORIAS_SIN_PERSONALIZAR.has(
       String(clase || '').trim().toLowerCase()
     );
   },
 
-  obtenerIngredientesSugeridos(clase, nombreProducto = '') {
+  obtenerIngredientesSugeridos(clase) {
     const categoria = String(clase || '').trim().toLowerCase();
     if (!this.esPersonalizable(categoria)) return [];
-
-    if (CATEGORIAS_SANDWICH.has(categoria)) {
-      const texto = String(nombreProducto || '').toLowerCase();
-      const esEspecial =
-        texto.includes('especial') ||
-        texto.includes('completa') ||
-        texto.includes('completo');
-      return esEspecial ? INGREDIENTES_SANDWICH_ESPECIAL : INGREDIENTES_SANDWICH_COMUN;
-    }
-
-    return INGREDIENTES_SANDWICH_COMUN;
+    return CATEGORIAS_SANDWICH.has(categoria) ? INGREDIENTES_SANDWICH_BASE : [];
   },
 
   obtenerAdicionalesPorCategoria(clase, adicionalesDB = []) {
@@ -99,10 +73,9 @@ export const apiCliente = {
     if (categoria === 'platos') return [];
 
     if (categoria === 'papas') {
-      return adicionalesDB.filter((ad) => {
-        const attr = String(ad.atributo || '').toUpperCase();
-        return !attr.includes('PAPA');
-      });
+      return adicionalesDB.filter(
+        (ad) => !String(ad.atributo || '').toUpperCase().includes('PAPA')
+      );
     }
 
     return adicionalesDB;
@@ -112,9 +85,9 @@ export const apiCliente = {
     try {
       const baseUrl = exigirApiUrl();
       const res = await fetchConTimeout(`${baseUrl}/configuracion`, {}, 8000);
-      if (!res.ok) return ADICIONALES_BASE;
+      if (!res.ok) return [];
       const rows = await res.json();
-      if (!Array.isArray(rows) || rows.length === 0) return ADICIONALES_BASE;
+      if (!Array.isArray(rows) || rows.length === 0) return [];
 
       const filtrados = rows.filter((item) => {
         const tipo = String(item.tipo || '').toLowerCase();
@@ -129,7 +102,7 @@ export const apiCliente = {
       }));
     } catch (err) {
       console.warn('No se pudieron cargar adicionales desde /configuracion:', err);
-      return ADICIONALES_BASE;
+      return [];
     }
   },
 
@@ -149,6 +122,7 @@ export const apiCliente = {
           ...item,
           id: item.id,
           nombre: item.nombre,
+          descripcion: String(item.descripcion || '').trim(),
           precio: Number(item.precio) || 0,
           imagen: resolverUrlImagen(item.imagen, baseUrl),
           clase
@@ -195,13 +169,10 @@ export const apiCliente = {
       return {
         id: item.id,
         nombre: etiquetaConNotas,
-        hidden_nombre: etiquetaConNotas,
         precio: subtotal,
-        hidden_precio: subtotal,
         precioUnitario: precioUnit,
         cantidad: item.cantidad,
         clase: item.clase,
-        hidden_clase: item.clase,
         notas
       };
     });

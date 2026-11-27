@@ -33,6 +33,13 @@ const obtenerIconoCategoria = (clase) => {
   return UtensilsCrossed;
 };
 
+const formatearContiene = (texto) => {
+  const limpio = String(texto || '').trim();
+  if (!limpio) return '';
+  if (/^contiene\b/i.test(limpio)) return limpio;
+  return `Contiene: ${limpio}`;
+};
+
 const ESTILO_BOTON_AMBAR =
   'px-3.5 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 bg-gradient-to-b from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-zinc-950 border border-amber-200/50 shadow-md shadow-amber-500/20 hover:shadow-lg hover:shadow-amber-400/30 transition-all duration-200 cursor-pointer select-none hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.97] disabled:translate-y-0 disabled:scale-100 disabled:bg-zinc-800/90 disabled:from-zinc-800 disabled:to-zinc-800 disabled:text-zinc-500 disabled:border-white/5 disabled:shadow-none disabled:cursor-not-allowed';
 
@@ -47,6 +54,7 @@ const CardProducto = ({
   const permitePersonalizar = apiCliente.esPersonalizable(producto.clase);
   const srcImagen = !errorImagen ? resolverSrcImagen(producto.imagen) : '';
   const IconoCategoria = obtenerIconoCategoria(producto.clase);
+  const textoContiene = formatearContiene(producto?.descripcion);
 
   useEffect(() => {
     setErrorImagen(false);
@@ -110,6 +118,12 @@ const CardProducto = ({
           <h3 className="text-sm sm:text-[15px] font-black text-white uppercase tracking-tight leading-snug break-words mt-2 drop-shadow-[0_2px_6px_rgba(0,0,0,0.95)] group-hover:text-orange-100 transition-colors">
             {producto.nombre}
           </h3>
+
+          {textoContiene && (
+            <p className="text-[11px] text-amber-200/90 font-medium leading-snug mt-1 line-clamp-2">
+              {textoContiene}
+            </p>
+          )}
         </div>
 
         <div className="flex items-center justify-between gap-3 pt-3 mt-3 border-t border-white/10">

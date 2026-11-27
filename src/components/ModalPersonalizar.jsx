@@ -2,6 +2,16 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { X, Check, Plus, Minus, SlidersHorizontal } from 'lucide-react';
 import { apiCliente } from '../services/apiCliente';
 
+const INGREDIENTES_DESACTIVADOS_POR_DEFECTO = new Set(['AJÍ']);
+
+const parsearIngredientesDescripcion = (descripcion = '') => {
+  if (!descripcion || typeof descripcion !== 'string') return [];
+  return descripcion
+    .split(',')
+    .map((parte) => parte.trim().toUpperCase())
+    .filter(Boolean);
+};
+
 const ModalPersonalizar = ({
   producto,
   adicionalesDB = [],
@@ -11,16 +21,34 @@ const ModalPersonalizar = ({
   const [ingredientesEstado, setIngredientesEstado] = useState({});
   const [agregados, setAgregados] = useState({});
 
+  const ingredientesDeDescripcion = useMemo(
+    () => parsearIngredientesDescripcion(producto?.descripcion),
+    [producto?.descripcion]
+  );
+
   useEffect(() => {
     if (!producto) return;
     const sugeridos = apiCliente.obtenerIngredientesSugeridos(
       producto.clase,
       producto.nombre
     );
-    const inicial = {};
-    sugeridos.forEach((ing) => {
-      inicial[ing] = true;
+    const extrasDescripcion = parsearIngredientesDescripcion(producto.descripcion);
+
+    const listaCombinada = [];
+    const vistos = new Set();
+
+    [...sugeridos, ...extrasDescripcion].forEach((ing) => {
+      const clave = String(ing || '').trim().toUpperCase();
+      if (!clave || vistos.has(clave)) return;
+      vistos.add(clave);
+      listaCombinada.push(clave);
     });
+
+    const inicial = {};
+    listaCombinada.forEach((ing) => {
+      inicial[ing] = !INGREDIENTES_DESACTIVADOS_POR_DEFECTO.has(ing);
+    });
+
     setIngredientesEstado(inicial);
     setAgregados({});
   }, [producto]);
@@ -91,6 +119,8 @@ const ModalPersonalizar = ({
     });
   };
 
+  const descripcionLimpia = String(producto?.descripcion || '').trim();
+
   return (
     <div className="fixed inset-0 z-50 bg-black/85 flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div className="anim-modal-sheet bg-[#111318] border border-orange-500/60 w-full max-w-md rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl">
@@ -124,31 +154,47 @@ const ModalPersonalizar = ({
 
         {/* Cuerpo */}
         <div className="p-5 space-y-5 max-h-[75vh] overflow-y-auto">
+          {descripcionLimpia && (
+            <div className="rounded-xl bg-amber-500/10 border border-amber-500/30 px-3.5 py-2.5">
+              <span className="text-[10px] font-black uppercase tracking-wider text-amber-300 flex items-center gap-1">
+                Este producto especial incluye:
+              </span>
+              <p className="text-xs font-bold text-amber-100 uppercase mt-1 leading-snug">
+                {descripcionLimpia}
+              </p>
+            </div>
+          )}
+
           {Object.keys(ingredientesEstado).length > 0 && (
             <div>
               <p className="text-[11px] font-black uppercase text-gray-400 mb-2.5">
-                Tocar para quitar de la receta
+                Tocar para activar o quitar ingredientes
               </p>
               <div className="flex flex-wrap gap-2">
-                {Object.entries(ingredientesEstado).map(([ing, incluido]) => (
-                  <button
-                    key={ing}
-                    type="button"
-                    onClick={() => toggleIngrediente(ing)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-black uppercase transition-transform active:scale-95 cursor-pointer ${
-                      incluido
-                        ? 'bg-black/50 border-white/15 text-gray-300 hover:border-white/30'
-                        : 'bg-red-500/20 border-red-500/60 text-red-300'
-                    }`}
-                  >
-                    {incluido ? (
-                      <Check size={12} className="text-emerald-400" />
-                    ) : (
-                      <X size={12} className="text-red-400" />
-                    )}
-                    {incluido ? ing : `SIN ${ing}`}
-                  </button>
-                ))}
+                {Object.entries(ingredientesEstado).map(([ing, incluido]) => {
+                  const esDeDescripcion = ingredientesDeDescripcion.includes(ing);
+                  return (
+                    <button
+                      key={ing}
+                      type="button"
+                      onClick={() => toggleIngrediente(ing)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-black uppercase transition-transform active:scale-95 cursor-pointer ${
+                        incluido
+                          ? esDeDescripcion
+                            ? 'bg-amber-500/10 border-amber-400/35 text-amber-200 hover:border-amber-300/60'
+                            : 'bg-black/50 border-white/15 text-gray-300 hover:border-white/30'
+                          : 'bg-red-500/20 border-red-500/60 text-red-300'
+                      }`}
+                    >
+                      {incluido ? (
+                        <Check size={12} className="text-emerald-400" />
+                      ) : (
+                        <X size={12} className="text-red-400" />
+                      )}
+                      {incluido ? ing : `SIN ${ing}`}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
