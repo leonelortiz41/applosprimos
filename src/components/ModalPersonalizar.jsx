@@ -157,7 +157,7 @@ const ModalPersonalizar = ({
           {descripcionLimpia && (
             <div className="rounded-xl bg-amber-500/10 border border-amber-500/30 px-3.5 py-2.5">
               <span className="text-[10px] font-black uppercase tracking-wider text-amber-300 flex items-center gap-1">
-                Este producto especial incluye:
+                Este producto incluye:
               </span>
               <p className="text-xs font-bold text-amber-100 uppercase mt-1 leading-snug">
                 {descripcionLimpia}
