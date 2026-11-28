@@ -6,7 +6,8 @@ import {
   UtensilsCrossed,
   CheckCircle2,
   ShieldCheck,
-  AlertCircle
+  AlertCircle,
+  BellRing
 } from 'lucide-react';
 
 const SECUENCIAS_PROHIBIDAS = [
@@ -406,6 +407,21 @@ const ModalCheckout = ({
               <span className="text-lg font-black text-orange-500">
                 ${totalPedido.toLocaleString('es-AR')}
               </span>
+            </div>
+          </div>
+
+          {/* Recordatorio visible antes de confirmar */}
+          <div className="rounded-2xl bg-amber-500/12 border border-amber-400/35 px-3.5 py-2.5 flex items-start gap-2.5">
+            <BellRing size={16} className="text-amber-300 shrink-0 mt-0.5" />
+            <div className="text-[11px] leading-snug text-amber-100">
+              <p className="font-black uppercase tracking-wide text-amber-300">
+                Recordatorio antes de confirmar
+              </p>
+              <p className="mt-0.5 text-gray-200">
+                {esMesa
+                  ? 'Revisá bien los ítems y observaciones de tu pedido. Una vez enviado pasa directo a cocina y caja.'
+                  : 'Verificá que tu teléfono sea correcto: nos comunicamos por WhatsApp o llamada para confirmar tu pedido antes de prepararlo.'}
+              </p>
             </div>
           </div>
 

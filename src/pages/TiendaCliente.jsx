@@ -67,47 +67,18 @@ const guardarSesionMesa = (numero, token = '') => {
 };
 
 const leerSesionMesaInicial = () => {
-  if (typeof window === 'undefined') return { mesa: null, token: '' };
+  if (typeof window === 'undefined') {
+    return { mesa: null, token: '', tokenFaltanteEnUrl: false };
+  }
 
   const params = new URLSearchParams(window.location.search);
   const rawMesa = params.get('mesa');
   const rawTokenUrl = String(params.get('token') || '').trim();
   const forzarWeb = params.get('modo') === 'web';
 
-  limpiarParametrosMesaEnUrl();
-
   if (forzarWeb) {
     borrarSesionMesa();
-    return { mesa: null, token: '' };
-  }
-
-  let sesionPrevia = null;
-  try {
-    const rawGuardada = sessionStorage.getItem(MESA_SESSION_KEY);
-    if (rawGuardada) {
-      const parsed = JSON.parse(rawGuardada);
-      const numeroGuardado = Number.parseInt(parsed?.numero, 10);
-      const guardadoEn = Number(parsed?.guardadoEn) || 0;
-      const tokenGuardado = String(parsed?.token || '').trim();
-
-      if (Date.now() - guardadoEn > TIEMPO_EXPIRACION_MESA_MS) {
-        borrarSesionMesa();
-      } else if (
-        Number.isInteger(numeroGuardado) &&
-        numeroGuardado > 0 &&
-        numeroGuardado <= 200 &&
-        tokenGuardado
-      ) {
-        sesionPrevia = {
-          mesa: numeroGuardado,
-          token: tokenGuardado
-        };
-      } else {
-        borrarSesionMesa();
-      }
-    }
-  } catch {
-    // Ignorar si no hay acceso a sessionStorage
+    return { mesa: null, token: '', tokenFaltanteEnUrl: false };
   }
 
   if (rawMesa !== null) {
@@ -116,20 +87,39 @@ const leerSesionMesaInicial = () => {
     if (Number.isInteger(numero) && numero > 0 && numero <= 200) {
       if (!rawTokenUrl) {
         borrarSesionMesa();
-        return { mesa: null, token: '' };
+        return { mesa: numero, token: '', tokenFaltanteEnUrl: true };
       }
       guardarSesionMesa(numero, rawTokenUrl);
-      return { mesa: numero, token: rawTokenUrl };
+      return { mesa: numero, token: rawTokenUrl, tokenFaltanteEnUrl: false };
     }
     borrarSesionMesa();
-    return { mesa: null, token: '' };
+    return { mesa: null, token: '', tokenFaltanteEnUrl: false };
   }
 
-  if (sesionPrevia) {
-    return sesionPrevia;
+  try {
+    const rawGuardada = sessionStorage.getItem(MESA_SESSION_KEY);
+    if (rawGuardada) {
+      const parsed = JSON.parse(rawGuardada);
+      const numeroGuardado = Number.parseInt(parsed?.numero, 10);
+      const guardadoEn = Number(parsed?.guardadoEn) || 0;
+      const tokenGuardado = String(parsed?.token || '').trim();
+
+      if (
+        Date.now() - guardadoEn <= TIEMPO_EXPIRACION_MESA_MS &&
+        Number.isInteger(numeroGuardado) &&
+        numeroGuardado > 0 &&
+        numeroGuardado <= 200 &&
+        tokenGuardado
+      ) {
+        return { mesa: numeroGuardado, token: tokenGuardado, tokenFaltanteEnUrl: false };
+      }
+      borrarSesionMesa();
+    }
+  } catch {
+    // Ignorar si no hay acceso a sessionStorage
   }
 
-  return { mesa: null, token: '' };
+  return { mesa: null, token: '', tokenFaltanteEnUrl: false };
 };
 
 const extraerTokenMesaDesdeConfig = (data = {}, numeroMesa = null) => {
@@ -196,6 +186,11 @@ const TiendaCliente = () => {
 
   const [mesa, setMesa] = useState(sesionInicial.mesa);
   const [tokenMesa, setTokenMesa] = useState(sesionInicial.token);
+  const [estadoMesa, setEstadoMesa] = useState(() => {
+    if (!sesionInicial.mesa) return 'ninguna';
+    if (sesionInicial.tokenFaltanteEnUrl || !sesionInicial.token) return 'invalida';
+    return 'verificando';
+  });
 
   const [productos, setProductos] = useState([]);
   const [adicionalesDB, setAdicionalesDB] = useState([]);
@@ -214,14 +209,21 @@ const TiendaCliente = () => {
   const [enviando, setEnviando] = useState(false);
   const [pedidoConfirmado, setPedidoConfirmado] = useState(null);
 
+  useEffect(() => {
+    limpiarParametrosMesaEnUrl();
+  }, []);
+
   const handleSalirMesa = useCallback(() => {
     borrarSesionMesa();
     setMesa(null);
     setTokenMesa('');
+    setEstadoMesa('ninguna');
   }, []);
 
   const verificarTokenMesaEnBackend = useCallback(async (numeroMesa, tokenCandidato) => {
-    if (!API_URL || !numeroMesa || !tokenCandidato) return false;
+    if (!API_URL || !numeroMesa || !tokenCandidato) {
+      return { valida: false, errorRed: false };
+    }
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 8000);
@@ -235,35 +237,51 @@ const TiendaCliente = () => {
         signal: controller.signal,
         cache: 'no-store'
       });
-      if (!res.ok) return false;
+      if (!res.ok) {
+        return { valida: false, errorRed: res.status >= 500 };
+      }
       const data = await res.json();
-      return Boolean(data?.valida);
+      return { valida: Boolean(data?.valida), errorRed: false };
     } catch {
-      return false;
+      return { valida: false, errorRed: true };
     } finally {
       clearTimeout(timeoutId);
     }
   }, []);
 
   useEffect(() => {
-    if (!mesa) return;
+    if (!mesa) {
+      setEstadoMesa('ninguna');
+      return;
+    }
+
+    if (!tokenMesa) {
+      setEstadoMesa('invalida');
+      return;
+    }
 
     let cancelado = false;
+    setEstadoMesa('verificando');
+
     (async () => {
-      if (!tokenMesa) {
-        if (!cancelado) handleSalirMesa();
-        return;
-      }
-      const esValido = await verificarTokenMesaEnBackend(mesa, tokenMesa);
-      if (!cancelado && !esValido) {
-        handleSalirMesa();
+      const resultado = await verificarTokenMesaEnBackend(mesa, tokenMesa);
+      if (cancelado) return;
+
+      if (resultado.valida) {
+        guardarSesionMesa(mesa, tokenMesa);
+        setEstadoMesa('valida');
+      } else if (!resultado.errorRed) {
+        borrarSesionMesa();
+        setEstadoMesa('invalida');
+      } else {
+        setEstadoMesa('verificando');
       }
     })();
 
     return () => {
       cancelado = true;
     };
-  }, [mesa, tokenMesa, verificarTokenMesaEnBackend, handleSalirMesa]);
+  }, [mesa, tokenMesa, verificarTokenMesaEnBackend]);
 
   const cargarConfigWeb = useCallback(async () => {
     if (!API_URL) return null;
@@ -279,7 +297,7 @@ const TiendaCliente = () => {
       if (!res.ok) return null;
       const data = await res.json();
 
-      if (mesa) {
+      if (mesa && estadoMesa === 'valida') {
         const tokenVigente = extraerTokenMesaDesdeConfig(data, mesa);
         if (tokenVigente) {
           setTokenMesa(tokenVigente);
@@ -305,7 +323,7 @@ const TiendaCliente = () => {
     } finally {
       clearTimeout(timeoutId);
     }
-  }, [mesa]);
+  }, [mesa, estadoMesa]);
 
   const cargarMenu = useCallback(async () => {
     setCargando(true);
@@ -467,13 +485,13 @@ const TiendaCliente = () => {
       return;
     }
 
-    const esMesa = Boolean(mesa);
+    const esMesa = Boolean(mesa) && estadoMesa === 'valida';
     const tipoEntregaFinal = esMesa ? 'MESA' : datosCliente.tipoEntrega;
     const tokenActivo = esMesa
       ? (configFresca ? extraerTokenMesaDesdeConfig(configFresca, mesa) : '') || tokenMesa
       : null;
 
-    if (esMesa && !tokenActivo) {
+    if (Boolean(mesa) && !tokenActivo) {
       alert(
         'No se pudo validar el código de la mesa. Escaneá el QR de la mesa o pedí como envío/retiro.'
       );
@@ -514,7 +532,7 @@ const TiendaCliente = () => {
 
   const subtituloModalidad = useMemo(() => {
     if (!configWeb.tiendaAbierta) return 'Pedidos online no disponibles';
-    if (mesa) return `Consumo en el local · Mesa #${mesa}`;
+    if (mesa && estadoMesa === 'valida') return `Consumo en el local · Mesa #${mesa}`;
     if (configWeb.envioActivo && configWeb.retiroActivo) {
       return 'Retiro en local o envío a domicilio';
     }
@@ -525,7 +543,8 @@ const TiendaCliente = () => {
     configWeb.tiendaAbierta,
     configWeb.envioActivo,
     configWeb.retiroActivo,
-    mesa
+    mesa,
+    estadoMesa
   ]);
 
   if (pedidoConfirmado) {
@@ -544,7 +563,7 @@ const TiendaCliente = () => {
         sinSistema={errorCarga || cargando}
         envioActivo={configWeb.envioActivo}
         subtitulo={subtituloModalidad}
-        mesa={mesa}
+        mesa={estadoMesa === 'valida' ? mesa : null}
         onSalirMesa={handleSalirMesa}
         busqueda={busqueda}
         onChangeBusqueda={setBusqueda}
@@ -554,6 +573,26 @@ const TiendaCliente = () => {
       />
 
       <main className="max-w-4xl mx-auto px-4 pt-4">
+        {mesa && estadoMesa === 'invalida' && (
+          <div className="mb-4 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/40 flex flex-wrap items-center justify-between gap-3">
+            <div className="text-xs">
+              <p className="font-black uppercase text-amber-300">
+                Código de mesa #{mesa} no válido o vencido
+              </p>
+              <p className="text-gray-300 mt-0.5">
+                Escaneá nuevamente el QR de la mesa o continuá pidiendo como envío/retiro.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleSalirMesa}
+              className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 text-xs font-black uppercase text-white cursor-pointer"
+            >
+              Pedir sin mesa
+            </button>
+          </div>
+        )}
+
         {cargando ? (
           <div className="py-16 text-center text-xs font-bold uppercase text-gray-400">
             Cargando menú...
@@ -652,7 +691,7 @@ const TiendaCliente = () => {
         abierto={checkoutAbierto}
         onCerrar={() => setCheckoutAbierto(false)}
         carrito={carrito}
-        mesa={mesa}
+        mesa={estadoMesa === 'valida' ? mesa : null}
         envioActivo={configWeb.envioActivo}
         retiroActivo={configWeb.retiroActivo}
         onConfirmarPedido={handleConfirmarPedido}
